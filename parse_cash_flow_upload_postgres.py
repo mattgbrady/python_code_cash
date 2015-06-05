@@ -4,6 +4,8 @@ import psycopg2
 import numpy as np
 import time
 from datetime import datetime
+from datetime import date
+
 
 
 def connect_to_database(host_name,port,username,password,database):
@@ -45,13 +47,20 @@ def upload_to_db(table_name,columns,temp_df,conn):
         conn.execute('INSERT INTO '+table_name+ ' ('+ column_string +') VALUES (' + input_string + ');', (data_list_2))
         conn.connection.commit() 
 
+def delete_duplicate_created_at(current_date,db_name,columns,temp_df,conn):
+    conn.execute('DELETE FROM '+ db_name +' WHERE created_at = '+current_date+'')
+    conn.connection.commit() 
+    return
+
 def process_file(conn,path_2,db_name):
 
     temp_df = pd.read_csv(path_2)
     columns = temp_df.columns.tolist()
     num_columns = str(len(columns))
-
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = "'"+current_date+"'"
     #function call
+    delete_duplicate_created_at(current_date,db_name,columns,temp_df,conn)
     upload_to_db(db_name,columns,temp_df,conn)   
 
 def format_df(df):
@@ -141,4 +150,3 @@ def main():
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
 
 main()
-
