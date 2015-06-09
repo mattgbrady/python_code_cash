@@ -5,6 +5,7 @@ import numpy as np
 import time
 from datetime import datetime
 from datetime import date
+from datetime import timedelta
 
 
 
@@ -55,6 +56,13 @@ def delete_duplicate_created_at(current_date,db_name,columns,temp_df,conn):
 def process_file(conn,path_2,db_name):
 
     temp_df = pd.read_csv(path_2)
+    temp_df = temp_df.set_index(temp_df['the_date'])
+
+    temp_df = temp_df.drop(temp_df.columns[0], axis=1)
+
+    print temp_df
+
+
     columns = temp_df.columns.tolist()
     num_columns = str(len(columns))
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -126,6 +134,19 @@ def main():
         new_df = new_df.append(loop_df)
         new_df.index.name = 'the_date'
     
+
+
+    current_date = datetime.today()
+    
+    current_date = current_date.now().date()
+  
+    end_date = current_date + timedelta(days=90)
+
+ 
+    new_df = new_df.reset_index()
+    
+    new_df = new_df[(new_df['the_date'] >= current_date) & (new_df['the_date'] <= end_date)]
+
     new_df.to_csv('formatted_cash_flows.csv')
 
     #need to define these variables
