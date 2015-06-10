@@ -47,19 +47,25 @@ def upload_to_db(table_name,columns,temp_df,conn):
 
     conn.connection.commit()
 
+def divide_1000(column):
+    return column/1000
+
+
 def sti_cf_view(conn,db_name):
 
-    criteria_1 = 'STI Balance'
+    criteria_1 = 'Starting STI Balance'
     criteria_1 = "'"+criteria_1+"'"
-    criteria_2 = 'Transfer From STI'
+    criteria_2 = 'Ending STI Balance'
     criteria_2 = "'"+criteria_2+"'"
-    criteria_3 = 'Transfer To STI'
+    criteria_3 = 'Transfer From STI'
     criteria_3 = "'"+criteria_3+"'"
-    criteria_4 = 'Transfer FROM STI'
+    criteria_4 = 'Transfer To STI'
     criteria_4 = "'"+criteria_4+"'"
+    criteria_5 = 'Transfer FROM STI'
+    criteria_5 = "'"+criteria_5+"'"
 
-    sql = ("SELECT max(created_at) FROM %s WHERE cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s" % 
-        (db_name,criteria_1,criteria_2,criteria_3, criteria_4))
+    sql = ("SELECT max(created_at) FROM %s WHERE cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s" % 
+        (db_name,criteria_1,criteria_2,criteria_3, criteria_4,criteria_5))
 
     conn.execute(sql)
     latest_created_at = conn.fetchone()
@@ -67,8 +73,8 @@ def sti_cf_view(conn,db_name):
     latest_created_at = latest_created_at.strftime("%Y-%m-%d")
     latest_created_at = "'"+latest_created_at+"'"
 
-    sql =  ("SELECT the_date, cash_flow_name, cash_flow_amount, created_at FROM %s WHERE (cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name =  %s OR cash_flow_name =  %s) and created_at = %s " % 
-                (db_name,criteria_1, criteria_2, criteria_3, criteria_4, latest_created_at))
+    sql =  ("SELECT the_date, cash_flow_name, cash_flow_amount, created_at FROM %s WHERE (cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name =  %s OR cash_flow_name =  %s OR cash_flow_name =  %s) and created_at = %s " % 
+                (db_name,criteria_1, criteria_2, criteria_3, criteria_4,criteria_5, latest_created_at))
  
     conn.execute(sql)
     
@@ -81,6 +87,8 @@ def sti_cf_view(conn,db_name):
     temp_df = df.from_records(data_tuple, columns=columns)
 
     temp_df = temp_df.sort('the_date')
+
+    temp_df['cash_flow_amount'] = temp_df['cash_flow_amount'].apply(divide_1000)
 
     current_date = datetime.today()
     
@@ -103,18 +111,22 @@ def sti_cf_view(conn,db_name):
 
     temp_df = temp_df.replace(to_replace='Transfer From STI',value='Outflow')
     temp_df = temp_df.replace(to_replace='Transfer To STI',value='Inflow')
+    temp_df = temp_df.replace(to_replace='Starting STI Balance',value='Starting Balance')
+    temp_df = temp_df.replace(to_replace='Ending STI Balance',value='Ending Balance')
 
-    temp_df['cash_flow_amount'][temp_df['cash_flow_name'] != 'STI Balance'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] != 'STI Balance'] * -1
+    temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] * -1
+    temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Inflow'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Inflow'] * -1
+
 
 
     columns= ['the_date','cash_flow_name','cash_flow_amount','db_created_at','number_of_days']
 
-
+    
     upload_to_db(db_name,columns,temp_df, conn)
   
 def cad_operations_cf_view(conn,db_name):
 
-    criteria_1 = 'Ending CAD Cash'
+    criteria_1 = 'Starting CAD Cash'
     criteria_1 = "'"+criteria_1+"'"
     criteria_2 = 'Ending CAD Cash'
     criteria_2 = "'"+criteria_2+"'"
@@ -147,6 +159,8 @@ def cad_operations_cf_view(conn,db_name):
 
     temp_df = temp_df.sort('the_date')
 
+    temp_df['cash_flow_amount'] = temp_df['cash_flow_amount'].apply(divide_1000)
+
     current_date = datetime.today()
     
     current_date = current_date.now().date()
@@ -168,7 +182,8 @@ def cad_operations_cf_view(conn,db_name):
 
     temp_df = temp_df.replace(to_replace='Total CAD Outflow',value='Outflow')
     temp_df = temp_df.replace(to_replace='Total CAD Inflow',value='Inflow')
-    temp_df = temp_df.replace(to_replace='Ending CAD Cash',value='CAD Operating Balance')
+    temp_df = temp_df.replace(to_replace='Ending CAD Cash',value='Ending Balance')
+    temp_df = temp_df.replace(to_replace='Starting CAD Cash',value='Starting Balance')
 
     columns= ['the_date','cash_flow_name','cash_flow_amount','db_created_at','number_of_days','flag_below_zero']
     
@@ -176,7 +191,7 @@ def cad_operations_cf_view(conn,db_name):
 
     temp_df['flag_below_zero'] = None
 
-    temp_df['flag_below_zero'][(temp_df['cash_flow_name'] == 'CAD Operating Balance') & (temp_df['cash_flow_amount'] < 0)] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'CAD Operating Balance') & (temp_df['cash_flow_amount'] < 0)].values
+    temp_df['flag_below_zero'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)].values
 
     upload_to_db(db_name,columns,temp_df, conn)
 
@@ -184,7 +199,7 @@ def usd_operations_cf_view(conn,db_name):
 
     criteria_1 = 'Ending USD Cash'
     criteria_1 = "'"+criteria_1+"'"
-    criteria_2 = 'Ending USD Cash'
+    criteria_2 = 'Starting USD Cash'
     criteria_2 = "'"+criteria_2+"'"
     criteria_3 = 'Total USD Inflow'
     criteria_3 = "'"+criteria_3+"'"
@@ -213,6 +228,10 @@ def usd_operations_cf_view(conn,db_name):
 
     temp_df = df.from_records(data_tuple, columns=columns)
 
+    
+    temp_df['cash_flow_amount'] = temp_df['cash_flow_amount'].apply(divide_1000)
+
+    
     temp_df = temp_df.sort('the_date')
 
     current_date = datetime.today()
@@ -236,7 +255,8 @@ def usd_operations_cf_view(conn,db_name):
 
     temp_df = temp_df.replace(to_replace='Total USD Outflow',value='Outflow')
     temp_df = temp_df.replace(to_replace='Total USD Inflow',value='Inflow')
-    temp_df = temp_df.replace(to_replace='Ending USD Cash',value='USD Operating Balance')
+    temp_df = temp_df.replace(to_replace='Ending USD Cash',value='Ending Balance')
+    temp_df = temp_df.replace(to_replace='Starting USD Cash',value='Starting Balance')
 
     columns= ['the_date','cash_flow_name','cash_flow_amount','db_created_at','number_of_days','flag_below_zero']
     
@@ -244,7 +264,9 @@ def usd_operations_cf_view(conn,db_name):
 
     temp_df['flag_below_zero'] = None
 
-    temp_df['flag_below_zero'][(temp_df['cash_flow_name'] == 'USD Operating Balance') & (temp_df['cash_flow_amount'] < 0)] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'USD Operating Balance') & (temp_df['cash_flow_amount'] < 0)].values
+    temp_df['flag_below_zero'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)].values
+
+   
 
     upload_to_db(db_name,columns,temp_df, conn)
 
