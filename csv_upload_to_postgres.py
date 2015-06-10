@@ -3,6 +3,9 @@ from pandas import DataFrame as df
 import psycopg2
 import numpy as np
 import time
+from datetime import datetime
+from datetime import date
+from datetime import timedelta
 
 def create_csv(path,worksheet_name_dict):
 
@@ -37,6 +40,10 @@ def replace_nan(data_list):
             data_list[each] = None       
     return data_list
 
+def delete_duplicate_created_at(current_date,db_name,columns,temp_df,conn):
+    conn.execute('DELETE FROM '+ db_name +' WHERE created_at = '+current_date+'')
+    conn.connection.commit() 
+    return
 
 def upload_to_db(table_name,columns,temp_df,conn):
 
@@ -61,6 +68,8 @@ def process_file(conn,path,worksheet_name_dict):
 
     #function call
     create_csv(path,worksheet_name_dict)
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = "'"+current_date+"'"
 
     for worksheet_name, table_name in worksheet_name_dict.iteritems():
         print table_name
@@ -69,6 +78,7 @@ def process_file(conn,path,worksheet_name_dict):
         num_columns = str(len(columns))
 
         #function call
+        delete_duplicate_created_at(current_date,table_name,columns,temp_df,conn)
         upload_to_db(table_name,columns,temp_df,conn)   
         
 def main():
@@ -91,7 +101,7 @@ def main():
     #value = database_name.table_name
     #data in worksheet needs to be in header(column) and row structure
     worksheet_name_dict = {'Issuers': 'the_zoo.sti_issuers' ,'Ticker Information': 'the_zoo.sti_ticker_information',
-                        'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings'}
+                        'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings', 'Rating Scale': 'the_zoo.rating_scale'}
 
     #function call
     conn = connect_to_database(host_name,port,username,password,database)
@@ -106,6 +116,5 @@ def main():
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
 
 main()
-
 
 
