@@ -44,3 +44,4 @@ Temporary Items
 *.csv
 Upload Data From Excel To Postgres - No Overwrite Option.py
 Upload Data From Excel To Postgres - Overwrite Option.py
+*.sql
