@@ -6,6 +6,7 @@ import time
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
+import sys
 
 def connect_to_database(host_name,port,username,password,database):
 
@@ -79,13 +80,46 @@ def format_issuer_df(temp_df, index):
 
     temp_df.sortlevel(0,ascending=True,inplace=True)
 
-    offset = pd.tseries.offsets.DateOffset()
-
     grouped_sum = temp_df.groupby(level='the_date').sum()
 
     temp_df['percentage'] = temp_df.div(grouped_sum,axis=0)
 
     return temp_df
+
+def check_security_duplicates(ticker_temp_df):
+    ticker_temp_df['security_bloomberg_ticker_dup'] = ticker_temp_df.duplicated()
+    duplicate_number = max(ticker_temp_df[ticker_temp_df.security_bloomberg_ticker_dup == True].count())
+    if duplicate_number != 0:
+        print ticker_temp_df[ticker_temp_df.security_bloomberg_ticker_dup == True]
+        sys.exit("ERROR");
+
+
+
+
+def categorize_issues(daily_mv_df,ticker_information_df,issuer_df):
+
+
+    ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name']]
+    check_security_duplicates(ticker_temp_df)
+
+    ticker_temp_df.drop('security_bloomberg_ticker_dup', axis=1, inplace=True)
+ 
+
+    daily_mv_df.reset_index(inplace=True)
+
+    ticker_temp_df.set_index('security_bloomberg_ticker', inplace=True)
+
+    daily_mv_df.join(ticker_temp_df, on ='security_bloomberg_ticker')
+
+    daily_mv_df = daily_mv_df.join(ticker_temp_df, on ='security_bloomberg_ticker')
+
+    issuer_df.set_index('issuer_name',inplace=True)
+
+    daily_mv_df = daily_mv_df.join(issuer_df, on ='issuer_name')
+
+    print daily_mv_df
+
+
 
 def portfolio_views(conn):
 
@@ -98,7 +132,11 @@ def portfolio_views(conn):
     min_date = min(daily_mv_df['the_date'])
     max_date = max(daily_mv_df['the_date'])
 
-    daily_mv_df = format_issuer_df(daily_mv_df,index=['the_date','bloomberg_ticker'])
+    daily_mv_df = format_issuer_df(daily_mv_df,index=['the_date','security_bloomberg_ticker'])
+
+    daily_mv_df = categorize_issues(daily_mv_df,ticker_information_df,issuer_df)
+
+    
 
 def main():
 
