@@ -18,9 +18,10 @@ def connect_to_database(host_name,port,username,password,database):
         print "I am unable to connect to the database"  
 
 def column_str(columns):
+
     column_string = ""
-    for each in columns:
-        column_string+=each+','
+    for count in range(0,len(columns)):
+        column_string+=columns[count]+','
     return column_string[:-1]
 
 def input_str(len_columns):
@@ -29,7 +30,38 @@ def input_str(len_columns):
         input_string+='%s'+','
     return input_string[:-1]
 
-def upload_to_db(table_name,columns,temp_df,conn):
+def get_column_names(conn,table_name):
+
+    sql =  ("SELECT * FROM %s " % (table_name))
+    conn.execute(sql)
+
+    columns = []
+
+    for count in range(0,len(conn.description)):
+        columns.append(conn.description[count][0])
+
+    columns = columns[1:-1]
+    return columns
+
+def upload_to_db(conn,temp_df,table_name):
+    
+    max_look_back = 30
+    
+    max_period = len(temp_df)
+
+    if max_look_back > max_period:
+        temp_df = temp_df[:max_look_back]
+    else:
+        temp_df = temp_df[-max_look_back:]
+
+    sql = ('TRUNCATE ' + table_name)
+
+    db_name = table_name
+
+    conn.execute(sql)
+    conn.connection.commit()
+
+    columns = get_column_names(conn,table_name)
 
     #function call
     column_string = column_str(columns)
@@ -48,7 +80,7 @@ def upload_to_db(table_name,columns,temp_df,conn):
 
     conn.connection.commit()
 
-def created_df(conn,db_name):
+def created_df_from_postgres(conn,db_name):
 
     sql = ("SELECT max(created_at) FROM %s" % (db_name))
 
@@ -69,10 +101,7 @@ def created_df(conn,db_name):
 
     return temp_df
 
-def format_issuer_df(temp_df, index):
-
-    min_date = min(temp_df['the_date'])
-    max_date = max(temp_df['the_date'])
+def get_positions_percentage(temp_df, index):
 
     temp_df.set_index(index, inplace=True)
 
@@ -93,11 +122,7 @@ def check_security_duplicates(ticker_temp_df):
         print ticker_temp_df[ticker_temp_df.security_bloomberg_ticker_dup == True]
         sys.exit("ERROR");
 
-
-
-
-def categorize_issues(daily_mv_df,ticker_information_df,issuer_df):
-
+def join_data_frames(daily_mv_df,ticker_information_df,issuer_df):
 
     ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name']]
     check_security_duplicates(ticker_temp_df)
@@ -117,26 +142,35 @@ def categorize_issues(daily_mv_df,ticker_information_df,issuer_df):
 
     daily_mv_df = daily_mv_df.join(issuer_df, on ='issuer_name')
 
-    print daily_mv_df
+    return daily_mv_df
 
+def create_views(conn,daily_mv_df,table_name,group_type):
 
+    grouped = daily_mv_df.groupby(by=['the_date',group_type]).sum()
 
-def portfolio_views(conn):
+    temp_df = df(grouped)
 
-    issuer_df = created_df(conn,db_name='the_zoo.sti_issuers')
-    daily_mv_df = created_df(conn,db_name='the_zoo.sti_daily_mv')
-    ticker_information_df = created_df(conn,db_name='the_zoo.sti_ticker_information')
-    issuer_ratings_df = created_df(conn,db_name='the_zoo.sti_ratings')
-    agency_rating_scale_df = created_df(conn,db_name='the_zoo.rating_scale')
-    
-    min_date = min(daily_mv_df['the_date'])
-    max_date = max(daily_mv_df['the_date'])
+    temp_df.reset_index(inplace=True)
 
-    daily_mv_df = format_issuer_df(daily_mv_df,index=['the_date','security_bloomberg_ticker'])
+    temp_df = temp_df[['the_date',group_type,'percentage']]
 
-    daily_mv_df = categorize_issues(daily_mv_df,ticker_information_df,issuer_df)
+    upload_to_db(conn,temp_df,table_name)
 
-    
+def process_daily_data(conn):
+
+    issuer_df = created_df_from_postgres(conn,db_name='the_zoo.sti_issuers')
+    daily_mv_df = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_mv')
+    ticker_information_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ticker_information')
+    issuer_ratings_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ratings')
+    agency_rating_scale_df = created_df_from_postgres(conn,db_name='the_zoo.rating_scale')
+
+    daily_mv_df = get_positions_percentage(daily_mv_df,index=['the_date','security_bloomberg_ticker'])
+
+    daily_mv_df = join_data_frames(daily_mv_df,ticker_information_df,issuer_df)
+
+    daily_mv_df.drop('id', axis=1, inplace=True)
+
+    return daily_mv_df  
 
 def main():
 
@@ -153,7 +187,10 @@ def main():
 
     conn = connect_to_database(host_name,port,username,password,database)
 
-    portfolio_views(conn)
+    daily_mv_df = process_daily_data(conn)
+    create_views(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    create_views(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    #create_views(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
