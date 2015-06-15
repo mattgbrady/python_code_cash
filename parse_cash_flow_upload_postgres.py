@@ -155,12 +155,13 @@ def main():
     username = 'username'
     password = 'password'
     database = 'database'
-    path = 'path'
 
 
     conn = connect_to_database(host_name,port,username,password,database)
 
     db_name = 'the_zoo.sti_cash_flows'
+
+    path_2 = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Python Code\\formatted_cash_flows.csv'
 
     process_file(conn,path_2,db_name)
 
