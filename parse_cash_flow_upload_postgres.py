@@ -60,9 +60,6 @@ def process_file(conn,path_2,db_name):
 
     temp_df = temp_df.drop(temp_df.columns[0], axis=1)
 
-    print temp_df
-
-
     columns = temp_df.columns.tolist()
     num_columns = str(len(columns))
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -79,6 +76,7 @@ def format_df(df):
     new_index = range(0,len(df.index))
     df = df.sort('Account Name')
     df['new_index'] = new_index
+    df.fillna(value=0, inplace=True)
     return df.set_index('new_index')
 
 def scrub_loop_df(df,index_value):
