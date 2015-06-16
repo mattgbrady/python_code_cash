@@ -45,7 +45,8 @@ def get_column_names(conn,table_name):
 
 def upload_to_db(conn,temp_df,table_name):
     
-    max_look_back = 30
+    #date_look_back
+    max_look_back = 45
     
     max_period = len(temp_df)
 
@@ -54,6 +55,7 @@ def upload_to_db(conn,temp_df,table_name):
     else:
         temp_df = temp_df[-max_look_back:]
 
+    temp_df.sort('the_date', inplace=True)
     sql = ('TRUNCATE ' + table_name)
 
     db_name = table_name
@@ -197,7 +199,5 @@ def main():
     minutes, seconds = time_elapsed // 60, time_elapsed % 60
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
-
-
 
 main()
