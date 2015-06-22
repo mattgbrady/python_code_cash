@@ -154,12 +154,17 @@ def main():
     password = 'password'
     database = 'database'
 
+    host_name = 'v-devsvrse01.corp.wurts.com'
+    port = '5432'
+    username = 'mbrady'
+    password = 'ulnae1,brood'
+    database = 'aquarium'
 
     conn = connect_to_database(host_name,port,username,password,database)
 
     db_name = 'the_zoo.sti_cash_flows'
 
-    path_2 = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Python Code\\formatted_cash_flows.csv'
+    path_2 = 'formatted_cash_flows.csv'
 
     process_file(conn,path_2,db_name)
 
