@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
+from user_credentials import database_credentials
 
 def create_csv(path,worksheet_name_dict):
 
@@ -85,18 +86,13 @@ def main():
 
     start_time = time.time()
 
-    #need to define these variables
-    host_name = 'host_name'
-    port = 'port'
-    username = 'username'
-    password = 'password'
-    database = 'database'
-    path = 'path'
-
-
+    # from user_credentials file
+    host_name = database_credentials.host_name 
+    port = database_credentials.port
+    username = database_credentials.username
+    password = database_credentials.password
+    database = database_credentials.database
  
-
-
     #keys = worksheet name
     #value = database_name.table_name
     #data in worksheet needs to be in header(column) and row structure

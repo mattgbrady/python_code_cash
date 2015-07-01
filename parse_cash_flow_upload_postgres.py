@@ -6,7 +6,9 @@ import time
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
+#from .user_credentials import user_credentials
 
+#print user_credentials.username
 
 
 def connect_to_database(host_name,port,username,password,database):
