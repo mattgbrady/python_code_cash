@@ -145,7 +145,7 @@ def main():
     
     new_df = new_df[(new_df['the_date'] >= current_date) & (new_df['the_date'] <= end_date)]
 
-    new_df.to_csv('formatted_cash_flows.csv')
+    new_df.to_csv('input_output_files/formatted_cash_flows.csv')
 
     # from user_credentials file
     host_name = database_credentials.host_name 
@@ -158,7 +158,7 @@ def main():
 
     db_name = 'the_zoo.sti_cash_flows'
 
-    path_2 = 'formatted_cash_flows.csv'
+    path_2 = 'input_output_files/formatted_cash_flows.csv'
 
     process_file(conn,path_2,db_name)
 
