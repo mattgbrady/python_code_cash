@@ -92,9 +92,7 @@ def main():
     username = database_credentials.username
     password = database_credentials.password
     database = database_credentials.database
- 
-    #keys = worksheet name
-    #value = database_name.table_name
+
     #data in worksheet needs to be in header(column) and row structure
     worksheet_name_dict = {'Issuers': 'the_zoo.sti_issuers' ,'Ticker Information': 'the_zoo.sti_ticker_information',
                         'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings', 'Rating Scale': 'the_zoo.rating_scale'}
@@ -103,7 +101,8 @@ def main():
     conn = connect_to_database(host_name,port,username,password,database)
 
     #function call
-    process_file(conn,path,worksheet_name_dict)
+    path = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Portfolio Reports\portfolio_tables.xlsx'
+    temp_df = process_file(conn,path,worksheet_name_dict)
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
