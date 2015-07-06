@@ -47,14 +47,19 @@ def get_column_names(conn,table_name):
 def upload_to_db(conn,temp_df,table_name):
     
     #date_look_back
-    max_look_back = 45
-    
-    max_period = len(temp_df)
+    days_look_back = 30
 
-    if max_look_back > max_period:
-        temp_df = temp_df[:max_look_back]
-    else:
-        temp_df = temp_df[-max_look_back:]
+    min_date = min(temp_df['the_date'])
+    max_date = max(temp_df['the_date'])
+
+    date_look_back =max(temp_df['the_date'])-timedelta(days=days_look_back)
+
+    if min_date <= date_look_back:
+        temp_df = temp_df[temp_df['the_date'] >=  date_look_back]
+        print temp_df
+    
+    #else:
+    #    temp_df = temp_df[-days_look_back:]
 
     temp_df.sort('the_date', inplace=True)
     sql = ('TRUNCATE ' + table_name)
