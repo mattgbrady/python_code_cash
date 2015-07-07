@@ -47,7 +47,7 @@ def get_column_names(conn,table_name):
 def upload_to_db(conn,temp_df,table_name):
     
     #date_look_back
-    days_look_back = 30
+    days_look_back = 45
 
     min_date = min(temp_df['the_date'])
     max_date = max(temp_df['the_date'])
@@ -56,10 +56,6 @@ def upload_to_db(conn,temp_df,table_name):
 
     if min_date <= date_look_back:
         temp_df = temp_df[temp_df['the_date'] >=  date_look_back]
-        print temp_df
-    
-    #else:
-    #    temp_df = temp_df[-days_look_back:]
 
     temp_df.sort('the_date', inplace=True)
     sql = ('TRUNCATE ' + table_name)
@@ -132,12 +128,11 @@ def check_security_duplicates(ticker_temp_df):
 
 def join_data_frames(daily_mv_df,ticker_information_df,issuer_df):
 
-    ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name']]
+    ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name','annualized_yield','maturity_date','category']]
     check_security_duplicates(ticker_temp_df)
 
     ticker_temp_df.drop('security_bloomberg_ticker_dup', axis=1, inplace=True)
  
-
     daily_mv_df.reset_index(inplace=True)
 
     ticker_temp_df.set_index('security_bloomberg_ticker', inplace=True)
@@ -152,7 +147,7 @@ def join_data_frames(daily_mv_df,ticker_information_df,issuer_df):
 
     return daily_mv_df
 
-def create_views(conn,daily_mv_df,table_name,group_type):
+def create_existing_sub_group_view(conn,daily_mv_df,table_name,group_type):
 
     grouped = daily_mv_df.groupby(by=['the_date',group_type]).sum()
 
@@ -164,21 +159,33 @@ def create_views(conn,daily_mv_df,table_name,group_type):
 
     upload_to_db(conn,temp_df,table_name)
 
+def maturity_schedule_view(conn,daily_mv_df,table_name):
+
+    return
+
+    #grouped = daily_mv_df.groupby(by=['the_date',group_type]).sum()
+
+    #temp_df = df(grouped)
+
+    #temp_df.reset_index(inplace=True)
+
+    #temp_df = temp_df[['the_date',group_type,'percentage']]
+
+    #upload_to_db(conn,temp_df,table_name)
+
 def process_daily_data(conn):
 
     issuer_df = created_df_from_postgres(conn,db_name='the_zoo.sti_issuers')
     daily_mv_df = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_mv')
     ticker_information_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ticker_information')
-    issuer_ratings_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ratings')
-    agency_rating_scale_df = created_df_from_postgres(conn,db_name='the_zoo.rating_scale')
-
+    
     daily_mv_df = get_positions_percentage(daily_mv_df,index=['the_date','security_bloomberg_ticker'])
 
     daily_mv_df = join_data_frames(daily_mv_df,ticker_information_df,issuer_df)
 
     daily_mv_df.drop('id', axis=1, inplace=True)
 
-    return daily_mv_df  
+    return daily_mv_df, ticker_information_df  
 
 def main():
 
@@ -194,10 +201,13 @@ def main():
 
     conn = connect_to_database(host_name,port,username,password,database)
 
-    daily_mv_df = process_daily_data(conn)
-    create_views(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
-    create_views(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
-    #create_views(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    daily_mv_df, ticker_information_df = process_daily_data(conn)
+
+    create_existing_sub_group_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    create_existing_sub_group_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    create_existing_sub_group_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
+    #maturity_schedule_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
