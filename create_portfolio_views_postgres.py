@@ -72,11 +72,13 @@ def upload_to_db(conn,temp_df,table_name):
     #function call
     input_string = input_str(len(columns))
 
-    for row in temp_df.iterrows():
+    for idx in temp_df.index:
 
-        index, data = row
+        data = temp_df.loc[idx]
+
+        #print data
         data_list = data.tolist()
-      
+ 
         #function call
         data_list_2 = tuple(data_list)
 
@@ -160,40 +162,41 @@ def type_view(conn,daily_mv_df,table_name,group_type):
     upload_to_db(conn,temp_df,table_name)
 
 def maturity_bucket(row):
-    
-    if row.number_of_days == 1:
+
+    if row.days_to_maturity == 0:
+        return 'Today'
+    if row.days_to_maturity == 1:
         return 'Overnight'
-    elif row.number_of_days > 1 and row.number_of_days <= 5:
+    elif row.days_to_maturity > 1 and row.days_to_maturity <= 5:
         return '2-5'
-    elif row.number_of_days > 5 and row.number_of_days <= 10:
+    elif row.days_to_maturity > 5 and row.days_to_maturity <= 10:
         return '6-10'   
-    elif row.number_of_days > 10 and row.number_of_days <= 20:
+    elif row.days_to_maturity > 10 and row.days_to_maturity <= 20:
         return '11-20'  
-    elif row.number_of_days > 20 and row.number_of_days <= 30:
+    elif row.days_to_maturity > 20 and row.days_to_maturity <= 30:
         return '21-30'  
-    elif row.number_of_days > 30 and row.number_of_days <= 45:
+    elif row.days_to_maturity > 30 and row.days_to_maturity <= 45:
         return '31-45'  
-    elif row.number_of_days > 45 and row.number_of_days <= 60:
+    elif row.days_to_maturity > 45 and row.days_to_maturity <= 60:
         return '46-60'  
-    elif row.number_of_days > 60 and row.number_of_days <= 90:
+    elif row.days_to_maturity > 60 and row.days_to_maturity <= 90:
         return '61-90'  
-    elif row.number_of_days > 90:
+    elif row.days_to_maturity > 90:
         return '>91'  
 
 def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
-    #only to be used for testing this code
-    #date should be current
-    testing_date = min(daily_mv_df['the_date']).date()
+    for idx in daily_mv_df.index:
+        maturity_date = daily_mv_df.loc[idx, 'maturity_date'] 
+        the_date = daily_mv_df.loc[idx,'the_date']
+        the_date = the_date.date()
+        days_to_maturity = maturity_date - the_date
 
-    #ticker_information_df['number_of_days'] = daily_mv_df['the_date'] - testing_date
+        daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
 
-    daily_mv_df['number_of_days'] = daily_mv_df['maturity_date'] - testing_date
+    daily_mv_df.days_to_maturity[daily_mv_df['security_bloomberg_ticker'] == 'Cash'] = 1
 
-
-    daily_mv_df['number_of_days'] = daily_mv_df['number_of_days'].astype('timedelta64[D]').astype(int)
-
-    daily_mv_df.number_of_days[daily_mv_df['security_bloomberg_ticker'] == 'Cash'] = 1
+    daily_mv_df['days_to_maturity'] = daily_mv_df['days_to_maturity'].astype('timedelta64[D]').astype(int)
 
     daily_mv_df['maturity_bucket'] = None
 
@@ -203,21 +206,107 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df = df(grouped)
 
-    
     temp_df.reset_index(inplace=True)
-    unique_date = set(temp_df['the_date'].values)
-    unique_date = unique_date[x.date for x in unique_date]
+
+    temp_df['market_value'] = temp_df['market_value'] / 1000000
+
+    temp_df['cash_flow_name'] = 'STI Maturity'
+
+    temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
 
     bucket_array = ['Overnight', '2-5', '6-10','11-20','21-30','31-45','46-60','61-90','>91']
 
+    latest_date = max(temp_df['the_date'])
+
+    latest_date_df = temp_df[temp_df['the_date'] == latest_date]
+
+    latest_maturity_bucket_array = latest_date_df['maturity_bucket'].values
+    
+    added_maturity_bucket_array = [x for x in bucket_array if x not in latest_maturity_bucket_array]
 
 
-    temp_df.reset_index(inplace=True)
+    rows_added = len(added_maturity_bucket_array)
 
-    temp_df = temp_df[['the_date','maturity_bucket','market_value','percentage']]
+    #build data for df
+    input_array = []
+    for count in range(0,rows_added):
+        loop_array = [latest_date,added_maturity_bucket_array[count],'holder','holder']
+        input_array.append(loop_array)
+    
+    append_df = df(input_array, columns=['the_date','maturity_bucket','market_value','percentage'])
+
+    append_df['cash_flow_name'] = 'STI Maturity'
+    temp_df = temp_df.append(append_df, ignore_index='True')
+
+
+    temp_df['market_value'][temp_df['market_value'] == 'holder'] = None
+    temp_df['percentage'][temp_df['percentage'] == 'holder'] = None
+
+
+    sti_cf = sti_cf_view(conn,'the_zoo.sti_cash_flows')
+
+    sti_cf['days_to_maturity'] = sti_cf['the_date'] - date.today()
+
+    sti_cf['days_to_maturity'] = sti_cf['days_to_maturity'].astype('timedelta64[D]').astype(int)
+
+
+    sti_cf['maturity_bucket'] = None
+
+    sti_cf['maturity_bucket'] = sti_cf.apply(maturity_bucket, axis=1)
+    grouped = sti_cf.groupby(by=['the_date','cash_flow_name','maturity_bucket']).sum()
+
+    sti_cf = df(grouped)
+
+    sti_cf.reset_index(inplace=True)
+
+    sti_cf = sti_cf[(sti_cf['cash_flow_name'] == 'Transfer From STI') OR (sti_cf['cash_flow_name'] == 'Transfer To STI')]
+
+    temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
+
+    print sti_cf
+    #sti_cf.reset_index(inplace=True)
 
 
     #upload_to_db(conn,temp_df,table_name)
+
+def sti_cf_view(conn,db_name):
+
+    criteria_1 = 'Starting STI Balance'
+    criteria_1 = "'"+criteria_1+"'"
+    criteria_2 = 'Ending STI Balance'
+    criteria_2 = "'"+criteria_2+"'"
+    criteria_3 = 'Transfer From STI'
+    criteria_3 = "'"+criteria_3+"'"
+    criteria_4 = 'Transfer To STI'
+    criteria_4 = "'"+criteria_4+"'"
+    criteria_5 = 'Transfer FROM STI'
+    criteria_5 = "'"+criteria_5+"'"
+
+    sql = ("SELECT max(created_at) FROM %s WHERE cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s" % 
+        (db_name,criteria_1,criteria_2,criteria_3, criteria_4,criteria_5))
+
+    conn.execute(sql)
+    latest_created_at = conn.fetchone()
+    latest_created_at = latest_created_at[0]
+    latest_created_at = latest_created_at.strftime("%Y-%m-%d")
+    latest_created_at = "'"+latest_created_at+"'"
+
+    sql =  ("SELECT the_date, cash_flow_name, cash_flow_amount, created_at FROM %s WHERE (cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name =  %s OR cash_flow_name =  %s OR cash_flow_name =  %s) and created_at = %s " % 
+                (db_name,criteria_1, criteria_2, criteria_3, criteria_4,criteria_5, latest_created_at))
+ 
+    conn.execute(sql)
+    
+    data_tuple =  conn.fetchall()
+
+    date_index = [i[0] for i in data_tuple]
+
+    columns= ['the_date','cash_flow_name','cash_flow_amount','db_created_at']
+
+    temp_df = df.from_records(data_tuple, columns=columns)
+
+    temp_df = temp_df.sort('the_date')
+
+    return temp_df
 
 def process_daily_data(conn):
 
@@ -248,7 +337,7 @@ def main():
     conn = connect_to_database(host_name,port,username,password,database)
 
     daily_mv_df, ticker_information_df = process_daily_data(conn)
-
+    
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')

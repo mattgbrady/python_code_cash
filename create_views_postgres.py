@@ -39,7 +39,6 @@ def upload_to_db(table_name,columns,temp_df,conn):
     input_string = input_str(len(columns))
 
     for row in temp_df.iterrows():
-
         index, data = row
         data_list = data.tolist()
       

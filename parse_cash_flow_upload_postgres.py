@@ -137,7 +137,7 @@ def main():
     current_date = datetime.today()
     
     current_date = current_date.now().date()
-  
+    #limit number of uploades
     end_date = current_date + timedelta(days=90)
 
  

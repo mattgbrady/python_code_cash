@@ -77,7 +77,7 @@ def process_file(conn,path,worksheet_name_dict):
         temp_df = pd.read_csv(worksheet_name + ".csv")
         columns = temp_df.columns.tolist()
         num_columns = str(len(columns))
-
+        
         #function call
         delete_duplicate_created_at(current_date,table_name,columns,temp_df,conn)
         upload_to_db(table_name,columns,temp_df,conn)   
