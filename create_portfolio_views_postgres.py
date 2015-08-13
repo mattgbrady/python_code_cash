@@ -71,12 +71,41 @@ def upload_to_db(conn,temp_df,table_name):
     column_string = column_str(columns)
     #function call
     input_string = input_str(len(columns))
-
+    
     for idx in temp_df.index:
 
         data = temp_df.loc[idx]
 
-        #print data
+        data_list = data.tolist()
+ 
+        #function call
+        data_list_2 = tuple(data_list)
+
+        conn.execute('INSERT INTO '+table_name+ ' ('+ column_string +') VALUES (' + input_string + ');', (data_list_2))
+
+    conn.connection.commit()
+
+def upload_to_db_maturity_bucket(conn,temp_df,table_name):
+    
+
+    sql = ('TRUNCATE ' + table_name)
+
+    db_name = table_name
+
+    conn.execute(sql)
+    conn.connection.commit()
+
+    columns = get_column_names(conn,table_name)
+
+    #function call
+    column_string = column_str(columns)
+    #function call
+    input_string = input_str(len(columns))
+    
+    for idx in temp_df.index:
+
+        data = temp_df.loc[idx]
+
         data_list = data.tolist()
  
         #function call
@@ -122,7 +151,7 @@ def get_positions_percentage(temp_df, index):
     return temp_df
 
 def check_security_duplicates(ticker_temp_df):
-    ticker_temp_df['security_bloomberg_ticker_dup'] = ticker_temp_df.duplicated()
+    ticker_temp_df.loc[:,'security_bloomberg_ticker_dup'] = ticker_temp_df.duplicated()
     duplicate_number = max(ticker_temp_df[ticker_temp_df.security_bloomberg_ticker_dup == True].count())
     if duplicate_number != 0:
         print ticker_temp_df[ticker_temp_df.security_bloomberg_ticker_dup == True]
@@ -133,7 +162,7 @@ def join_type_view_df(daily_mv_df,ticker_information_df,issuer_df):
     ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name','annualized_yield','maturity_date','category']]
     check_security_duplicates(ticker_temp_df)
 
-    ticker_temp_df.drop('security_bloomberg_ticker_dup', axis=1, inplace=True)
+    ticker_temp_df = ticker_temp_df.drop('security_bloomberg_ticker_dup', axis=1)
  
     daily_mv_df.reset_index(inplace=True)
 
@@ -164,7 +193,7 @@ def type_view(conn,daily_mv_df,table_name,group_type):
 def maturity_bucket(row):
 
     if row.days_to_maturity == 0:
-        return 'Today'
+        return 'Cash'
     if row.days_to_maturity == 1:
         return 'Overnight'
     elif row.days_to_maturity > 1 and row.days_to_maturity <= 5:
@@ -184,6 +213,7 @@ def maturity_bucket(row):
     elif row.days_to_maturity > 90:
         return '>91'  
 
+
 def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     for idx in daily_mv_df.index:
@@ -194,7 +224,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
         daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
 
-    daily_mv_df.days_to_maturity[daily_mv_df['security_bloomberg_ticker'] == 'Cash'] = 1
+    daily_mv_df.days_to_maturity[daily_mv_df['security_bloomberg_ticker']== 'Cash'] = 1
 
     daily_mv_df['days_to_maturity'] = daily_mv_df['days_to_maturity'].astype('timedelta64[D]').astype(int)
 
@@ -226,11 +256,11 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
 
     rows_added = len(added_maturity_bucket_array)
-
+    
     #build data for df
     input_array = []
     for count in range(0,rows_added):
-        loop_array = [latest_date,added_maturity_bucket_array[count],'holder','holder']
+        loop_array = [latest_date,added_maturity_bucket_array[count],None,None]
         input_array.append(loop_array)
     
     append_df = df(input_array, columns=['the_date','maturity_bucket','market_value','percentage'])
@@ -238,11 +268,11 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     append_df['cash_flow_name'] = 'STI Maturity'
     temp_df = temp_df.append(append_df, ignore_index='True')
 
-
+    
     temp_df['market_value'][temp_df['market_value'] == 'holder'] = None
-    temp_df['percentage'][temp_df['percentage'] == 'holder'] = None
+    temp_df.loc[:,'percentage'][temp_df.loc[:,'percentage'] == 'holder'] = None
 
-
+    
     sti_cf = sti_cf_view(conn,'the_zoo.sti_cash_flows')
 
     sti_cf['days_to_maturity'] = sti_cf['the_date'] - date.today()
@@ -259,15 +289,36 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     sti_cf.reset_index(inplace=True)
 
-    sti_cf = sti_cf[(sti_cf['cash_flow_name'] == 'Transfer From STI') OR (sti_cf['cash_flow_name'] == 'Transfer To STI')]
-
+    sti_cf = sti_cf[(sti_cf['cash_flow_name'] == 'Transfer From STI') | (sti_cf['cash_flow_name'] == 'Transfer To STI')]
+    
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
 
-    print sti_cf
-    #sti_cf.reset_index(inplace=True)
 
+    sti_cf['maturity_bucket'] = sti_cf.apply(maturity_bucket, axis=1)
 
-    #upload_to_db(conn,temp_df,table_name)
+    grouped = sti_cf.groupby(by=['cash_flow_name','maturity_bucket']).sum()
+
+    sti_cf = df(grouped)
+
+    temp_df.reset_index(inplace=True)
+
+    sti_cf.reset_index(inplace=True)
+      
+   
+    sti_cf.rename(columns={'cash_flow_amount': 'market_value'}, inplace=True)
+
+    temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
+    upload_to_db(conn,temp_df,table_name)
+
+    temp_df = temp_df[temp_df['the_date'] == max(temp_df['the_date'])]
+
+    sti_cf.drop(['days_to_maturity'], axis=1, inplace=True)
+    sti_cf['market_value'] = sti_cf['market_value'] /1000
+    temp_df.drop(['the_date','percentage'], axis=1, inplace=True)
+
+    temp_df = temp_df.append(sti_cf)
+
+    upload_to_db_maturity_bucket(conn,temp_df,'the_zoo.sti_current_maturity_bucket')
 
 def sti_cf_view(conn,db_name):
 
@@ -338,9 +389,9 @@ def main():
 
     daily_mv_df, ticker_information_df = process_daily_data(conn)
     
-    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
-    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
-    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
+    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
     maturity_bucket_view(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
 
 
