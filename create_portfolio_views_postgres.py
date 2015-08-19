@@ -242,6 +242,29 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df['cash_flow_name'] = 'STI Maturity'
 
+    rolling_sti_market = temp_df[['the_date','market_value','days_to_maturity']]
+
+    days_index = range(0,60)
+
+
+    rolling_sti_market = rolling_sti_market[rolling_sti_market['the_date'] == max(rolling_sti_market['the_date'])]
+
+    rolling_sti_market.set_index(['days_to_maturity'], inplace=True)
+    
+    
+    rolling_index = rolling_sti_market.index.values
+
+    rolling_index = [x for x in rolling_index]
+
+    unique_days = set(days_index+rolling_index)
+
+    days_index_df = df(index=unique_days)
+    
+    rolling_sti_market = rolling_sti_market.append(days_index_df,ignore_index=False)
+    
+    rolling_sti_market.sort_index(axis=0,inplace=True)
+
+    print days_index_df
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
 
     bucket_array = ['Overnight', '2-5', '6-10','11-20','21-30','31-45','46-60','61-90','>91']
@@ -309,6 +332,8 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
     upload_to_db(conn,temp_df,table_name)
+
+   
 
     temp_df = temp_df[temp_df['the_date'] == max(temp_df['the_date'])]
 
