@@ -95,7 +95,8 @@ def main():
 
     #data in worksheet needs to be in header(column) and row structure
     worksheet_name_dict = {'Issuers': 'the_zoo.sti_issuers' ,'Ticker Information': 'the_zoo.sti_ticker_information',
-                        'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings', 'Rating Scale': 'the_zoo.rating_scale'}
+                        'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings', 'Rating Scale': 'the_zoo.rating_scale', 
+                        'Money Market Yield': 'the_zoo.sti_money_mkt_yield' }
 
     #function call
     conn = connect_to_database(host_name,port,username,password,database)

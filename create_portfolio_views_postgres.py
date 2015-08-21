@@ -159,6 +159,7 @@ def check_security_duplicates(ticker_temp_df):
 def join_type_view_df(daily_mv_df,ticker_information_df,issuer_df):
 
     ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name','annualized_yield','maturity_date','category']]
+
     check_security_duplicates(ticker_temp_df)
 
     ticker_temp_df = ticker_temp_df.drop('security_bloomberg_ticker_dup', axis=1)
@@ -174,6 +175,8 @@ def join_type_view_df(daily_mv_df,ticker_information_df,issuer_df):
     issuer_df.set_index('issuer_name',inplace=True)
 
     daily_mv_df = daily_mv_df.join(issuer_df, on ='issuer_name')
+
+
 
     return daily_mv_df
 
@@ -223,7 +226,8 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
         daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
 
-    daily_mv_df.days_to_maturity[daily_mv_df['security_bloomberg_ticker']== 'Cash'] = 1
+    daily_mv_df.days_to_maturity[daily_mv_df['security_bloomberg_ticker']== 'CIBCMMFP CN Equity'] = 0
+
 
     daily_mv_df['days_to_maturity'] = daily_mv_df['days_to_maturity'].astype('timedelta64[D]').astype(int)
 
@@ -450,7 +454,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     rolling_cumulative_cash['cumulative_cash'][rolling_cumulative_cash['cash_flow_name'] == 'Transfer To STI'] = rolling_cumulative_cash['cumulative_cash'][rolling_cumulative_cash['cash_flow_name'] == 'Transfer To STI'] * -1
 
-    #upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+   
     diff_df = rolling_cumulative_cash
 
     diff_df['cumulative_cash'][diff_df['cash_flow_name'] == 'Transfer From STI'] = diff_df['cumulative_cash'][diff_df['cash_flow_name'] == 'Transfer From STI'] * -1
@@ -459,7 +463,6 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     temp_series = diff_df.sum(axis=1)
 
     
-
     surplus_def = df(temp_series)
 
     surplus_def['cash_flow_name'] = 'Surplus/Deficit'
@@ -479,6 +482,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     
     upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+
 def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
     current_df = daily_mv_df[daily_mv_df['the_date'] == max(daily_mv_df['the_date'])]
@@ -497,6 +501,36 @@ def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
     upload_to_db_maturity_bucket(conn,current_df,table_name)
 
+def portfolio_characteristics(conn,daily_mv_df,ticker_information_df,table_name) :
+
+    #current_df = daily_mv_df[daily_mv_df['the_date'] == max(daily_mv_df['the_date'])]
+
+    for idx in daily_mv_df.index:
+        maturity_date = daily_mv_df.loc[idx, 'maturity_date'] 
+        the_date = daily_mv_df.loc[idx,'the_date']
+        the_date = the_date.date()
+        days_to_maturity = maturity_date - the_date
+        daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
+
+
+    
+    daily_mv_df['days_to_maturity'] = daily_mv_df['days_to_maturity'].astype('timedelta64[D]').astype(int)
+
+    daily_mv_df.loc[daily_mv_df.loc[:,'issuer_name'] == 'Cash', 'days_to_maturity'] = 0
+
+    daily_mv_df['weight_yield'] = daily_mv_df.loc[:,'annualized_yield'] * daily_mv_df.loc[:,'percentage']
+
+    grouped = daily_mv_df.groupby(by=['the_date'])['weight_yield'].sum()
+  
+    temp_df = df(grouped)
+
+    print temp_df
+
+    temp_df.reset_index(inplace=True)
+
+    #print temp_df
+
+    #upload_to_db_maturity_bucket(conn,current_df,table_name)
 
 def sti_cf_view(conn,db_name):
 
@@ -542,6 +576,7 @@ def process_daily_data(conn):
     issuer_df = created_df_from_postgres(conn,db_name='the_zoo.sti_issuers')
     daily_mv_df = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_mv')
     ticker_information_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ticker_information')
+    daily_money_mkt_yield = created_df_from_postgres(conn,db_name='the_zoo.sti_money_mkt_yield')
     
     daily_mv_df = get_positions_percentage(daily_mv_df,index=['the_date','security_bloomberg_ticker'])
 
@@ -549,7 +584,14 @@ def process_daily_data(conn):
 
     daily_mv_df.drop('id', axis=1, inplace=True)
 
-    return daily_mv_df, ticker_information_df  
+    temp_map = daily_money_mkt_yield.set_index('the_date')['yield']
+
+    temp_df = daily_mv_df[daily_mv_df['issuer_name'] == 'Cash']['the_date'].map(temp_map).ffill()
+
+
+    daily_mv_df.loc[daily_mv_df.loc[:,'issuer_name'] == 'Cash', 'annualized_yield'] = temp_df.values / 100
+
+    return daily_mv_df, ticker_information_df
 
 def main():
 
@@ -570,10 +612,9 @@ def main():
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
-    maturity_bucket_view(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+    #maturity_bucket_view(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
     #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
-    #portfolio_charateristics(conn, daily_mv_df,ticker_information_df, table_name = )
-
+    portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_portfolio_characteristics')
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
