@@ -101,11 +101,10 @@ def upload_to_db_maturity_bucket(conn,temp_df,table_name):
     column_string = column_str(columns)
     #function call
     input_string = input_str(len(columns))
-    
+
     for idx in temp_df.index:
 
         data = temp_df.loc[idx]
-
         data_list = data.tolist()
  
         #function call
@@ -233,8 +232,9 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     daily_mv_df['maturity_bucket'] = daily_mv_df.apply(maturity_bucket, axis=1)
 
     grouped = daily_mv_df.groupby(by=['the_date','maturity_bucket']).sum()
-
+  
     temp_df = df(grouped)
+
 
     temp_df.reset_index(inplace=True)
 
@@ -242,21 +242,26 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df['cash_flow_name'] = 'STI Maturity'
 
-    rolling_sti_market = temp_df[['the_date','market_value','days_to_maturity']]
 
-    days_index = range(0,60)
-
+    rolling_sti_market = daily_mv_df[['the_date','market_value','days_to_maturity','maturity_bucket']]
 
     rolling_sti_market = rolling_sti_market[rolling_sti_market['the_date'] == max(rolling_sti_market['the_date'])]
 
-    rolling_sti_market.set_index(['days_to_maturity'], inplace=True)
-    
-    
+    grouped = rolling_sti_market.groupby(by=['days_to_maturity']).sum()
+
+    rolling_sti_market = df(grouped)
+
+    days_index = range(0,61)
+
+     
+    rolling_sti_market.sort_index(inplace=True)
+
     rolling_index = rolling_sti_market.index.values
 
     rolling_index = [x for x in rolling_index]
 
-    unique_days = set(days_index+rolling_index)
+
+    unique_days = [x for x in days_index if x not in rolling_index]
 
     days_index_df = df(index=unique_days)
     
@@ -264,7 +269,22 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     
     rolling_sti_market.sort_index(axis=0,inplace=True)
 
-    print days_index_df
+    rolling_sti_market['STI Maturity'] = rolling_sti_market['market_value'].cumsum()
+
+
+    rolling_sti_market.fillna(value=None,method='ffill', inplace=True)
+
+    rolling_sti_market['cash_flow_name'] = 'STI Maturity'
+
+    rolling_sti_market.drop(['market_value'], axis=1, inplace=True)
+
+    rolling_sti_market.rename(columns={'STI Maturity': 'cumulative_cash'}, inplace=True)
+
+    rolling_sti_market.reset_index(inplace=True)
+
+    rolling_sti_market['cumulative_cash'] = rolling_sti_market['cumulative_cash'] / 1000000
+
+
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
 
     bucket_array = ['Overnight', '2-5', '6-10','11-20','21-30','31-45','46-60','61-90','>91']
@@ -298,10 +318,13 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     
     sti_cf = sti_cf_view(conn,'the_zoo.sti_cash_flows')
 
+    sti_cf.sort(columns='the_date', inplace=True)
+
     sti_cf['days_to_maturity'] = sti_cf['the_date'] - date.today()
 
     sti_cf['days_to_maturity'] = sti_cf['days_to_maturity'].astype('timedelta64[D]').astype(int)
 
+    sti_cf = sti_cf[sti_cf['days_to_maturity'] < 61]
 
     sti_cf['maturity_bucket'] = None
 
@@ -313,7 +336,74 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     sti_cf.reset_index(inplace=True)
 
     sti_cf = sti_cf[(sti_cf['cash_flow_name'] == 'Transfer From STI') | (sti_cf['cash_flow_name'] == 'Transfer To STI')]
+
+    rolling_sti_transfer_from_sti = sti_cf[sti_cf['cash_flow_name'] == 'Transfer From STI']
+
+
+    rolling_sti_transfer_from_sti.set_index(['days_to_maturity'], inplace=True)
+
+
+    rolling_index = rolling_sti_transfer_from_sti.index.values
+
+    rolling_index = [x for x in rolling_index]
+
+
+    unique_days = [x for x in days_index if x not in rolling_index]
+
+    days_index_df = df(index=unique_days)
     
+    rolling_sti_transfer_from_sti = rolling_sti_transfer_from_sti.append(days_index_df,ignore_index=False)
+
+    
+    rolling_sti_transfer_from_sti.sort_index(axis=0,inplace=True)
+
+    rolling_sti_transfer_from_sti.drop(['maturity_bucket','the_date'], axis=1, inplace=True)
+
+
+    rolling_sti_transfer_from_sti['cumulative_cash'] = rolling_sti_transfer_from_sti['cash_flow_amount'].cumsum()
+
+    rolling_sti_transfer_from_sti.drop(['cash_flow_amount'], axis=1, inplace=True)
+
+    rolling_sti_transfer_from_sti['cumulative_cash'] = rolling_sti_transfer_from_sti['cumulative_cash'] / 1000
+
+    rolling_sti_transfer_from_sti.reset_index(inplace=True)
+
+    rolling_sti_transfer_from_sti.fillna(0, inplace=True)
+
+
+    rolling_sti_transfer_to_sti = sti_cf[sti_cf['cash_flow_name'] == 'Transfer To STI']
+
+    rolling_sti_transfer_to_sti.set_index(['days_to_maturity'], inplace=True)
+
+    rolling_index = rolling_sti_transfer_to_sti.index.values
+
+    rolling_index = [x for x in rolling_index]
+
+
+    unique_days = [x for x in days_index if x not in rolling_index]
+
+    days_index_df = df(index=unique_days)
+    
+    rolling_sti_transfer_to_sti = rolling_sti_transfer_to_sti.append(days_index_df,ignore_index=False)
+
+    
+    rolling_sti_transfer_to_sti.sort_index(axis=0,inplace=True)
+
+    rolling_sti_transfer_to_sti.drop(['maturity_bucket','the_date'], axis=1, inplace=True)
+
+
+    rolling_sti_transfer_to_sti['cumulative_cash'] = rolling_sti_transfer_to_sti['cash_flow_amount'].cumsum()
+
+    rolling_sti_transfer_to_sti.drop(['cash_flow_amount'], axis=1, inplace=True)
+
+    rolling_sti_transfer_to_sti['cumulative_cash'] = rolling_sti_transfer_to_sti['cumulative_cash'] / 1000
+
+    rolling_sti_transfer_to_sti.reset_index(inplace=True)
+
+    rolling_sti_transfer_to_sti.fillna(0, inplace=True)
+    
+    rolling_cumulative_cash = pd.concat([rolling_sti_market,rolling_sti_transfer_from_sti,rolling_sti_transfer_to_sti], axis=0)
+
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
 
 
@@ -331,10 +421,10 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     sti_cf.rename(columns={'cash_flow_amount': 'market_value'}, inplace=True)
 
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']]
+
     upload_to_db(conn,temp_df,table_name)
 
    
-
     temp_df = temp_df[temp_df['the_date'] == max(temp_df['the_date'])]
 
     sti_cf.drop(['days_to_maturity'], axis=1, inplace=True)
@@ -343,7 +433,70 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df = temp_df.append(sti_cf)
 
+    temp_df['market_value'][temp_df['cash_flow_name'] == 'Transfer To STI'] = temp_df['market_value'][temp_df['cash_flow_name'] == 'Transfer To STI'] * -1
+
+    temp_df['market_value'] = np.where(temp_df['market_value'] == 0, None, temp_df['market_value'])
+
     upload_to_db_maturity_bucket(conn,temp_df,'the_zoo.sti_current_maturity_bucket')
+
+    rolling_cumulative_cash.reset_index(inplace=True)
+
+    rolling_cumulative_cash['days_to_maturity'] = rolling_cumulative_cash[['days_to_maturity']].astype(int)
+
+    rolling_cumulative_cash.drop('index',axis=1,inplace=True)
+
+    rolling_cumulative_cash.reset_index()
+
+
+    rolling_cumulative_cash['cumulative_cash'][rolling_cumulative_cash['cash_flow_name'] == 'Transfer To STI'] = rolling_cumulative_cash['cumulative_cash'][rolling_cumulative_cash['cash_flow_name'] == 'Transfer To STI'] * -1
+
+    #upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+    diff_df = rolling_cumulative_cash
+
+    diff_df['cumulative_cash'][diff_df['cash_flow_name'] == 'Transfer From STI'] = diff_df['cumulative_cash'][diff_df['cash_flow_name'] == 'Transfer From STI'] * -1
+    diff_df = rolling_cumulative_cash.pivot(index='days_to_maturity', columns='cash_flow_name').swaplevel(1,0,axis=1)
+
+    temp_series = diff_df.sum(axis=1)
+
+    
+
+    surplus_def = df(temp_series)
+
+    surplus_def['cash_flow_name'] = 'Surplus/Deficit'
+
+    surplus_def.columns = ['cumulative_cash','cash_flow_name']
+
+    surplus_def.reset_index(inplace=True)
+
+   
+    rolling_cumulative_cash = rolling_cumulative_cash.append(surplus_def,ignore_index=True)
+
+
+    rolling_cumulative_cash['days_to_maturity'] = rolling_cumulative_cash[['days_to_maturity']].astype(int)
+
+    rolling_cumulative_cash['cumulative_cash'][rolling_cumulative_cash['cash_flow_name'] == 'Transfer From STI'] = rolling_cumulative_cash['cumulative_cash'][rolling_cumulative_cash['cash_flow_name'] == 'Transfer From STI'] * -1
+    rolling_cumulative_cash['cumulative_cash'] = np.where(rolling_cumulative_cash['cumulative_cash'] == 0, None, rolling_cumulative_cash['cumulative_cash'])
+
+    
+    upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
+
+    current_df = daily_mv_df[daily_mv_df['the_date'] == max(daily_mv_df['the_date'])]
+
+    current_df = current_df.sort('market_value', ascending=False)
+
+    current_df = current_df[:5]
+
+    current_df['days_to_maturity'] = current_df['maturity_date'] - date.today()
+
+    current_df['days_to_maturity'] = current_df['days_to_maturity'].astype('timedelta64[D]').astype(int)
+
+    current_df['market_value'] = current_df['market_value']  / 1000000
+
+    current_df = current_df[['issuer_name','category','market_value','percentage','maturity_date','days_to_maturity']]
+
+    upload_to_db_maturity_bucket(conn,current_df,table_name)
+
 
 def sti_cf_view(conn,db_name):
 
@@ -414,10 +567,12 @@ def main():
 
     daily_mv_df, ticker_information_df = process_daily_data(conn)
     
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
     maturity_bucket_view(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+    #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
+    #portfolio_charateristics(conn, daily_mv_df,ticker_information_df, table_name = )
 
 
     end_time = time.time()
