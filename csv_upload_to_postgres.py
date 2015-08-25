@@ -102,7 +102,7 @@ def main():
     conn = connect_to_database(host_name,port,username,password,database)
 
     #function call
-    path = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Portfolio Reports\portfolio_tables.xlsx'
+    path = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Portfolio Reports\portfolio_tables - Test.xlsx'
     temp_df = process_file(conn,path,worksheet_name_dict)
 
     end_time = time.time()

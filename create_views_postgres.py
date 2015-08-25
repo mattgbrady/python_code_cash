@@ -116,8 +116,9 @@ def sti_cf_view(conn,db_name):
     temp_df = temp_df.replace(to_replace='Starting STI Balance',value='Starting Balance')
     temp_df = temp_df.replace(to_replace='Ending STI Balance',value='Ending Balance')
 
-    temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] * -1
-    temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Inflow'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Inflow'] * -1
+    #temp_df.loc['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] * -1
+    temp_df.loc[temp_df.loc[:,'cash_flow_name'] == 'Outflow','cash_flow_amount'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Outflow'] * -1
+    temp_df.loc[temp_df.loc[:,'cash_flow_name'] == 'Inflow','cash_flow_amount'] = temp_df['cash_flow_amount'][temp_df['cash_flow_name'] == 'Inflow'] * -1
 
 
 
@@ -193,7 +194,7 @@ def cad_operations_cf_view(conn,db_name):
 
     temp_df['flag_below_zero'] = None
 
-    temp_df['flag_below_zero'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)].values
+    temp_df.loc[(temp_df.loc[:,'cash_flow_name'] == 'Ending Balance') & (temp_df.loc[:,'cash_flow_amount'] < 0), 'flag_below_zero'] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)].values
 
     upload_to_db(db_name,columns,temp_df, conn)
 
@@ -266,7 +267,7 @@ def usd_operations_cf_view(conn,db_name):
 
     temp_df['flag_below_zero'] = None
 
-    temp_df['flag_below_zero'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)].values
+    temp_df.loc[(temp_df.loc[:,'cash_flow_name'] == 'Ending Balance') & (temp_df.loc[:,'cash_flow_amount'] < 0), 'flag_below_zero'] = temp_df['cash_flow_amount'][(temp_df['cash_flow_name'] == 'Ending Balance') & (temp_df['cash_flow_amount'] < 0)].values
 
    
 
