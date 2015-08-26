@@ -69,6 +69,7 @@ def upload_to_db(conn,temp_df,table_name):
 
     #function call
     column_string = column_str(columns)
+
     #function call
     input_string = input_str(len(columns))
     
@@ -77,8 +78,6 @@ def upload_to_db(conn,temp_df,table_name):
         data = temp_df.loc[idx]
 
         data_list = data.tolist()
-
-
         #function call
         data_list_2 = tuple(data_list)
 
@@ -229,32 +228,35 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
         daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
 
-    daily_mv_df.loc[daily_mv_df.loc[:,'security_bloomberg_ticker'] == 'CIBCMMFP CN Equity', 'days_to_maturity'] = 0
+    data_copy = daily_mv_df.copy()        
+    data_copy.loc[data_copy.loc[:,'security_bloomberg_ticker'] == 'CIBCMMFP CN Equity', 'days_to_maturity'] = 0
 
-    daily_mv_df.loc[:,'days_to_maturity'] = daily_mv_df.loc[:,'days_to_maturity'].astype('timedelta64[D]').astype(int)
+    data_copy.loc[:,'days_to_maturity'] = data_copy.loc[:,'days_to_maturity'].astype('timedelta64[D]').astype(int)
 
-    daily_mv_df['maturity_bucket'] = None
+    data_copy['maturity_bucket'] = None
  
-    daily_mv_df.loc[:,'maturity_bucket'] = daily_mv_df.apply(maturity_bucket, axis=1)
+    data_copy.loc[:,'maturity_bucket'] = data_copy.apply(maturity_bucket, axis=1)
 
-    grouped = daily_mv_df.groupby(by=['the_date','maturity_bucket']).sum()
+    grouped = data_copy.groupby(by=['the_date','maturity_bucket']).sum()
   
     temp_df = df(grouped)
 
     temp_df.reset_index(inplace=True)
+
 
     temp_df.loc[:,'market_value'] = temp_df.loc[:,'market_value'] / 1000000
 
     temp_df.loc[:,'cash_flow_name'] = 'STI Maturity'
     
 
-    rolling_sti_market = daily_mv_df[['the_date','market_value','days_to_maturity','maturity_bucket']].copy()
+    rolling_sti_market = data_copy[['the_date','market_value','days_to_maturity','maturity_bucket']].copy()
 
     rolling_sti_market = rolling_sti_market.loc[rolling_sti_market.loc[:,'the_date'] == max(rolling_sti_market.loc[:,'the_date'])]
 
     grouped = rolling_sti_market.groupby(by=['days_to_maturity']).sum()
 
     rolling_sti_market = df(grouped)
+
 
     days_index = range(0,61)
 
@@ -275,6 +277,8 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     rolling_sti_market.sort_index(axis=0,inplace=True)
 
     rolling_sti_market.loc[:,'STI Maturity'] = rolling_sti_market.loc[:,'market_value'].cumsum()
+
+    rolling_sti_market_fill_zero = rolling_sti_market.copy()
 
 
     rolling_sti_market.fillna(value=None,method='ffill', inplace=True)
@@ -484,9 +488,26 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] = rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] * -1
     rolling_cumulative_cash.loc[:,'cumulative_cash'] = np.where(rolling_cumulative_cash.loc[:,'cumulative_cash'] == 0, None, rolling_cumulative_cash.loc[:,'cumulative_cash'])
 
-    
-    upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+    rolling_sti_market_fill_zero = rolling_sti_market_fill_zero['market_value'].copy()
+   
+    rolling_sti_market_fill_zero.fillna(value=0,inplace=True)
 
+    the_date = np.datetime64(the_date)
+
+    end_date = the_date + np.timedelta64(61,'D')
+
+    date_arr = np.arange(the_date,end_date)
+
+    rolling_sti_market_fill_zero = pd.Series(rolling_sti_market_fill_zero.values, index=date_arr)
+
+    rolling_sti_market_fill_zero = rolling_sti_market_fill_zero.reset_index()
+
+    rolling_sti_market_fill_zero.rename(columns={'index':'the_date',0:'maturity_cash'},inplace=True)
+
+    rolling_sti_market_fill_zero.loc[:,'maturity_cash'] = rolling_sti_market_fill_zero.loc[:,'maturity_cash'] / 1000000
+
+    upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+    upload_to_db_maturity_bucket(conn,rolling_sti_market_fill_zero,'the_zoo.sti_maturity_by_date')
 
 def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
@@ -494,22 +515,24 @@ def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
     the_date = the_date.date()
 
- 
     current_df = daily_mv_df.loc[daily_mv_df.loc[:,'the_date'] == max(daily_mv_df.loc[:,'the_date'])]
 
     current_df = current_df.sort('market_value', ascending=False)
-
-    current_df = current_df[:5]
 
     current_df.loc[:,'days_to_maturity'] = current_df.loc[:,'maturity_date'] - the_date
 
     current_df.loc[:,'days_to_maturity'] = current_df.loc[:,'days_to_maturity'].astype('timedelta64[D]').astype(int)
 
+    current_df.loc[current_df.loc[:,'issuer_name'] == 'Cash', 'days_to_maturity'] = 0
+
     current_df.loc[:,'market_value'] = current_df.loc[:,'market_value']  / 1000000
 
     current_df = current_df[['issuer_name','category','market_value','percentage','maturity_date','days_to_maturity']]
 
-    upload_to_db_maturity_bucket(conn,current_df,table_name)
+    top_five_df = current_df[:5].copy()
+
+    upload_to_db_maturity_bucket(conn,top_five_df,table_name)
+    upload_to_db_maturity_bucket(conn,current_df,table_name='the_zoo.sti_all_holdings_current')
 
 def portfolio_characteristics(conn,daily_mv_df,ticker_information_df,table_name) :
 
@@ -522,10 +545,10 @@ def portfolio_characteristics(conn,daily_mv_df,ticker_information_df,table_name)
         daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
 
 
-    
-    daily_mv_df.loc[:,'days_to_maturity'] = daily_mv_df.loc[:'days_to_maturity'].astype('timedelta64[D]').astype(int)
+    daily_mv_df.loc[:,'days_to_maturity'] = daily_mv_df.loc[:,'days_to_maturity'].astype('timedelta64[D]').astype(int)
 
     daily_mv_df.loc[daily_mv_df.loc[:,'issuer_name'] == 'Cash', 'days_to_maturity'] = 0
+
 
     daily_mv_df.loc[:,'weight_yield'] = daily_mv_df.loc[:,'annualized_yield'] * daily_mv_df.loc[:,'percentage']
 
@@ -585,8 +608,9 @@ def portfolio_characteristics(conn,daily_mv_df,ticker_information_df,table_name)
 
     final_df['Type'] = 'STI Portfolio'
 
-    final_df = final_df[['the_date','Type','market_value','number_of_holdings','weight_yield','weight_maturity','average_maturity','longest_maturity','percentage_maturing']]
+    final_df = final_df[['the_date','Type','market_value','number_of_holdings','weight_yield','weight_maturity','average_maturity','longest_maturity','percentage_maturing']].copy()
 
+    final_df.loc[:,'number_of_holdings'] = final_df.loc[:,'number_of_holdings'].astype(float)
     upload_to_db(conn,final_df,table_name)
 
 
@@ -672,11 +696,11 @@ def main():
     the_date = max(daily_mv_df['the_date'])
     the_date = the_date.date()
 
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
+    #ype_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
     maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
-    top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
+    #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
     #portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
     
 
