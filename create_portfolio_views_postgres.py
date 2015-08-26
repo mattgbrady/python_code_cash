@@ -675,6 +675,83 @@ def sti_cf_view(conn,db_name):
 
     return temp_df
 
+def portfolio_guidelines(conn,daily_mv_df,table_name):
+
+    sti_balance_view = daily_mv_df.copy()
+    aggregate_limits = daily_mv_df.copy()
+
+    #aggregate_limits.loc[aggregate_limits.loc[:,'security_sector'] == 'Government'] =  'Canada'
+
+
+    #print aggregate_limits
+
+    criteria_1 = 'opg'
+    criteria_1 = "'"+criteria_1+"'"
+  
+
+    sql = ("SELECT * FROM %s WHERE client_id = %s " % (table_name,criteria_1))
+
+    conn.execute(sql)
+
+    data_tuple =  conn.fetchall()
+
+    date_index = [i[0] for i in data_tuple]
+
+    columns= ['client','the_date','market_value','delta_adj_mk']
+
+    opg_mk_value = df.from_records(data_tuple, columns=columns)
+
+    opg_mk_value = opg_mk_value.sort('the_date')
+
+    opg_mk_value = opg_mk_value[['the_date','market_value']].copy()
+
+    opg_mk_value.set_index('the_date', inplace=True)
+
+    opg_mk_value.rename(columns={'market_value':'opg'}, inplace=True)
+
+
+    opg_mk_value['opg'] = opg_mk_value['opg']/1000000
+
+    grouped = sti_balance_view.groupby(by=['the_date'])['market_value'].sum()
+
+    
+    opg_mk_value.reset_index(inplace=True)
+
+    sti_balance_view.reset_index(inplace=True)
+
+    sti_balance_view['the_date'] = pd.to_datetime(sti_balance_view['the_date'])
+
+    opg_mk_value['the_date'] = pd.to_datetime(opg_mk_value['the_date'])
+
+    sti_balance_view = df(grouped)
+
+    sti_balance_view.rename(columns={'market_value':'sti'},inplace=True)
+
+    sti_balance_view['sti'] = sti_balance_view['sti']/1000000
+
+    sti_balance_view.reset_index(inplace=True)
+
+    sti_balance_view.set_index('the_date',inplace=True)
+
+    opg_mk_value.set_index('the_date', inplace=True)
+
+    combined_df = df.join(sti_balance_view,opg_mk_value)
+
+    combined_df.fillna(value=None,method='ffill', inplace=True)
+
+    combined_df['sti/opg'] = combined_df['sti']/combined_df['opg']
+
+    combined_df = combined_df.stack()
+
+    combined_df = combined_df.reset_index()
+
+    combined_df = combined_df[:45]
+
+    combined_df.rename(columns={'level_1':'balance_category',0:'market_value'}, inplace=True)
+
+
+    upload_to_db(conn,combined_df,table_name='the_zoo.sti_guideline_balance')
+
 
 def main():
 
@@ -696,13 +773,13 @@ def main():
     the_date = max(daily_mv_df['the_date'])
     the_date = the_date.date()
 
-    #ype_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
-    maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+    #maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
     #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
     #portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
-    
+    portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
