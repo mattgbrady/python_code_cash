@@ -79,6 +79,7 @@ def upload_to_db(conn,temp_df,table_name):
 
         data_list = data.tolist()
         #function call
+
         data_list_2 = tuple(data_list)
 
         conn.execute('INSERT INTO '+table_name+ ' ('+ column_string +') VALUES (' + input_string + ');', (data_list_2))
@@ -152,29 +153,29 @@ def get_positions_percentage(temp_df, index):
 
 def check_security_duplicates(ticker_temp_df):
 
-    ticker_temp_df.loc[:,'security_bloomberg_ticker_dup'] = ticker_temp_df.duplicated()
+    ticker_temp_df.loc[:,'ticker_dup'] = ticker_temp_df.duplicated()
 
-    duplicate_number = max(ticker_temp_df.loc[ticker_temp_df.loc[:,'security_bloomberg_ticker_dup'] == True].count())
+    duplicate_number = max(ticker_temp_df.loc[ticker_temp_df.loc[:,'ticker_dup'] == True].count())
 
     if duplicate_number != 0:
-        print ticker_temp_df.loc[ticker_temp_df.loc[:,'security_bloomberg_ticker_dup' == True]]
+        print ticker_temp_df.loc[ticker_temp_df.loc[:,'ticker_dup' == True]]
         sys.exit("ERROR");
 
 def join_type_view_df(daily_mv_df,ticker_information_df,issuer_df):
 
-    ticker_temp_df = ticker_information_df[['security_bloomberg_ticker','issuer_name','annualized_yield','maturity_date','category']].copy()
+    ticker_temp_df = ticker_information_df[['ticker','issuer_name','annualized_yield','maturity_date','category']].copy()
 
     check_security_duplicates(ticker_temp_df)
 
-    ticker_temp_df = ticker_temp_df.drop('security_bloomberg_ticker_dup', axis=1)
+    ticker_temp_df = ticker_temp_df.drop('ticker_dup', axis=1)
  
     daily_mv_df.reset_index(inplace=True)
 
-    ticker_temp_df.set_index('security_bloomberg_ticker', inplace=True)
+    ticker_temp_df.set_index('ticker', inplace=True)
 
-    daily_mv_df.join(ticker_temp_df, on ='security_bloomberg_ticker')
+    daily_mv_df.join(ticker_temp_df, on ='ticker')
 
-    daily_mv_df = daily_mv_df.join(ticker_temp_df, on ='security_bloomberg_ticker')
+    daily_mv_df = daily_mv_df.join(ticker_temp_df, on ='ticker')
 
     issuer_df.set_index('issuer_name',inplace=True)
 
@@ -196,8 +197,9 @@ def type_view(conn,daily_mv_df,table_name,group_type):
 
 def maturity_bucket(row):
 
+
     if row.days_to_maturity == 0:
-        return 'Cash'
+        return 'Today'
     if row.days_to_maturity == 1:
         return 'Overnight'
     elif row.days_to_maturity > 1 and row.days_to_maturity <= 5:
@@ -212,26 +214,51 @@ def maturity_bucket(row):
         return '31-45'  
     elif row.days_to_maturity > 45 and row.days_to_maturity <= 60:
         return '46-60'  
-    elif row.days_to_maturity > 60 and row.days_to_maturity <= 90:
-        return '61-90'  
-    elif row.days_to_maturity > 90:
-        return '>91'  
+    #elif row.days_to_maturity > 60 and row.days_to_maturity <= 90:
+    #    return '61-90'  
+    elif row.days_to_maturity > 60:
+        return '>60'  
 
 
 def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
+
+    
+    cash_available = created_df_from_postgres(conn,'the_zoo.sti_cash_available')
+
+    cash_available.drop(['created_at','id'], axis=1, inplace=True)
+
+    cash_available.rename(columns={'cash_available': 'market_value'}, inplace=True)
+
+    cash_available['ticker'] = 'Cash Available'
+
+    cash_available['the_date'] = pd.to_datetime(cash_available['the_date'])
+
+    daily_mv_df = daily_mv_df.append(cash_available)
+
+    daily_mv_df.reset_index(inplace=True)
+
+    daily_mv_df.drop(['index'], axis=1, inplace=True)
+
     for idx in daily_mv_df.index:
-        maturity_date = daily_mv_df.loc[idx, 'maturity_date'] 
-        the_date = daily_mv_df.loc[idx,'the_date']
-        the_date = the_date.date()
-        days_to_maturity = maturity_date - the_date
+        ticker_flag = daily_mv_df.loc[idx, 'ticker'] 
+        if ticker_flag == 'Cash Available':
+            daily_mv_df.loc[idx,'days_to_maturity'] = 0
+        else:
+            maturity_date = daily_mv_df.loc[idx, 'maturity_date'] 
+            the_date = daily_mv_df.loc[idx,'the_date']
+            the_date = the_date.date()
+            days_to_maturity = maturity_date - the_date
 
-        daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
+            daily_mv_df.loc[idx,'days_to_maturity'] = days_to_maturity
 
-    data_copy = daily_mv_df.copy()        
-    data_copy.loc[data_copy.loc[:,'security_bloomberg_ticker'] == 'CIBCMMFP CN Equity', 'days_to_maturity'] = 0
+    data_copy = daily_mv_df.copy()  
+
 
     data_copy.loc[:,'days_to_maturity'] = data_copy.loc[:,'days_to_maturity'].astype('timedelta64[D]').astype(int)
+
+    data_copy.loc[data_copy.loc[:,'ticker'] == 'Cash', 'days_to_maturity'] = 1
+
 
     data_copy['maturity_bucket'] = None
  
@@ -241,13 +268,15 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
   
     temp_df = df(grouped)
 
-    temp_df.reset_index(inplace=True)
 
+    temp_df.reset_index(inplace=True)
 
     temp_df.loc[:,'market_value'] = temp_df.loc[:,'market_value'] / 1000000
 
-    temp_df.loc[:,'cash_flow_name'] = 'STI Maturity'
-    
+
+
+    temp_df.loc[(temp_df.loc[:,'maturity_bucket'] !=  'Today', 'cash_flow_name')] = 'STI Maturity'
+    temp_df.loc[(temp_df.loc[:,'maturity_bucket'] ==  'Today', 'cash_flow_name')] = 'Available Cash'
 
     rolling_sti_market = data_copy[['the_date','market_value','days_to_maturity','maturity_bucket']].copy()
 
@@ -296,7 +325,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']].copy()
 
-    bucket_array = ['Overnight', '2-5', '6-10','11-20','21-30','31-45','46-60','61-90','>91']
+    bucket_array = ['Overnight', '2-5', '6-10','11-20','21-30','31-45','46-60','>60']
 
     latest_date = max(temp_df['the_date'])
 
@@ -416,7 +445,9 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']].copy()
 
 
+
     sti_cf.loc[:,'maturity_bucket'] = sti_cf.apply(maturity_bucket, axis=1)
+
 
     grouped = sti_cf.groupby(by=['cash_flow_name','maturity_bucket']).sum()
 
@@ -431,10 +462,12 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df = temp_df[['the_date','cash_flow_name','maturity_bucket','market_value','percentage']].copy()
 
+ 
     upload_to_db(conn,temp_df,table_name)
 
    
     temp_df = temp_df[temp_df['the_date'] == max(temp_df['the_date'])]
+
 
     sti_cf.drop(['days_to_maturity'], axis=1, inplace=True)
     sti_cf.loc[:,'market_value'] = sti_cf.loc[:,'market_value'] /1000
@@ -448,6 +481,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df.reset_index(inplace=True)
     temp_df.drop('index',axis=1,inplace=True)
+
 
     upload_to_db_maturity_bucket(conn,temp_df,'the_zoo.sti_current_maturity_bucket')
 
@@ -466,6 +500,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     diff_df = rolling_cumulative_cash
 
     diff_df.loc[diff_df.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] = diff_df.loc[diff_df.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] * -1
+    
     diff_df = rolling_cumulative_cash.pivot(index='days_to_maturity', columns='cash_flow_name').swaplevel(1,0,axis=1)
 
     temp_series = diff_df.sum(axis=1)
@@ -507,7 +542,13 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     rolling_sti_market_fill_zero.loc[:,'maturity_cash'] = rolling_sti_market_fill_zero.loc[:,'maturity_cash'] / 1000000
 
     upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
+
+    rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'STI Maturity', 'cash_flow_name'] = 'STI Maturity & Available Cash'
+
+    upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
     upload_to_db_maturity_bucket(conn,rolling_sti_market_fill_zero,'the_zoo.sti_maturity_by_date')
+
+
 
 def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
@@ -610,7 +651,8 @@ def portfolio_characteristics(conn,daily_mv_df,ticker_information_df,table_name)
 
     final_df = final_df[['the_date','Type','market_value','number_of_holdings','weight_yield','weight_maturity','average_maturity','longest_maturity','percentage_maturing']].copy()
 
-    final_df.loc[:,'number_of_holdings'] = final_df.loc[:,'number_of_holdings'].astype(float)
+    final_df.loc[:,'number_of_holdings'] = final_df.loc[:,'number_of_holdings'].astype(int)
+
     upload_to_db(conn,final_df,table_name)
 
 
@@ -621,7 +663,7 @@ def process_daily_data(conn):
     ticker_information_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ticker_information')
     daily_money_mkt_yield = created_df_from_postgres(conn,db_name='the_zoo.sti_money_mkt_yield')
 
-    daily_mv_df = get_positions_percentage(daily_mv_df,index=['the_date','security_bloomberg_ticker'])
+    daily_mv_df = get_positions_percentage(daily_mv_df,index=['the_date','ticker'])
 
     daily_mv_df = join_type_view_df(daily_mv_df,ticker_information_df,issuer_df)
 
@@ -735,9 +777,17 @@ def portfolio_guidelines(conn,daily_mv_df,table_name):
 
     opg_mk_value.set_index('the_date', inplace=True)
 
-    combined_df = df.join(sti_balance_view,opg_mk_value)
+
+    combined_df = df.join(opg_mk_value,sti_balance_view,how='outer')
+
+    sti_inputs = combined_df.sti.count()
+
+    if sti_inputs >= 45:
+        sti_inputs = 45
 
     combined_df.fillna(value=None,method='ffill', inplace=True)
+
+  
 
     combined_df['sti/opg'] = combined_df['sti']/combined_df['opg']
 
@@ -745,10 +795,11 @@ def portfolio_guidelines(conn,daily_mv_df,table_name):
 
     combined_df = combined_df.reset_index()
 
-    combined_df = combined_df[:45]
+    num_categories = len(set(combined_df.level_1))
+    combined_df = combined_df[-sti_inputs*num_categories::]
+
 
     combined_df.rename(columns={'level_1':'balance_category',0:'market_value'}, inplace=True)
-
 
     upload_to_db(conn,combined_df,table_name='the_zoo.sti_guideline_balance')
 
@@ -776,10 +827,10 @@ def main():
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
     #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
-    #maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+    maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
     #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
     #portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
-    portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
+    #portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
