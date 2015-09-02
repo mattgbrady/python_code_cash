@@ -73,7 +73,7 @@ def process_file(conn,path,worksheet_name_dict):
     current_date = "'"+current_date+"'"
 
     for worksheet_name, table_name in worksheet_name_dict.iteritems():
-        print table_name
+
         temp_df = pd.read_csv(worksheet_name + ".csv")
         columns = temp_df.columns.tolist()
         num_columns = str(len(columns))
@@ -111,6 +111,6 @@ def main():
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
 
-main()
+
 
 

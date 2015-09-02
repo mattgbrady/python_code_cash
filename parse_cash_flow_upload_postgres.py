@@ -41,7 +41,7 @@ def upload_to_db(table_name,columns,temp_df,conn):
 
         index, data = row
         data_list = data.tolist()
-        print data_list
+        
         #function call
         data_list_2 = tuple(data_list)
 
@@ -168,4 +168,4 @@ def main():
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
 
-main()
+
