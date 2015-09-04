@@ -257,7 +257,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     data_copy.loc[:,'days_to_maturity'] = data_copy.loc[:,'days_to_maturity'].astype('timedelta64[D]').astype(int)
 
-    data_copy.loc[data_copy.loc[:,'ticker'] == 'Cash', 'days_to_maturity'] = 1
+    data_copy.loc[data_copy.loc[:,'ticker'] == 'Cash', 'days_to_maturity'] = 0
 
 
     data_copy['maturity_bucket'] = None
@@ -662,12 +662,16 @@ def process_daily_data(conn):
     daily_mv_df = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_mv')
     ticker_information_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ticker_information')
     daily_money_mkt_yield = created_df_from_postgres(conn,db_name='the_zoo.sti_money_mkt_yield')
+    daily_purchases = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_purchases')
+
+    daily_purchases.drop('id', axis=1, inplace=True)
 
     daily_mv_df = get_positions_percentage(daily_mv_df,index=['the_date','ticker'])
 
     daily_mv_df = join_type_view_df(daily_mv_df,ticker_information_df,issuer_df)
-
+ 
     daily_mv_df.drop('id', axis=1, inplace=True)
+
 
     temp_map = daily_money_mkt_yield.set_index('the_date')['yield']
 
@@ -675,6 +679,14 @@ def process_daily_data(conn):
 
 
     daily_mv_df.loc[daily_mv_df.loc[:,'issuer_name'] == 'Cash', 'annualized_yield'] = temp_df.values / 100
+
+    grouped = daily_mv_df.groupby('the_date')
+
+    print daily_mv_df
+    
+    temp_df = df(grouped)
+    #print temp_df
+    #print daily_mv_df
 
     return daily_mv_df, ticker_information_df
 
@@ -820,20 +832,21 @@ def main():
 
     daily_mv_df, ticker_information_df = process_daily_data(conn)
 
-
     the_date = max(daily_mv_df['the_date'])
     the_date = the_date.date()
 
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
-    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
-    maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
-    top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
-    portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
-    portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
+    #maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+    #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
+    #portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
+    #portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
     minutes, seconds = time_elapsed // 60, time_elapsed % 60
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
+
+main()

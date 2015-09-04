@@ -26,4 +26,4 @@ end_time = time.time()
 time_elapsed = int(end_time - start_time)
 minutes, seconds = time_elapsed // 60, time_elapsed % 60
 
-print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
+print("Total processing time is " + str(minutes) + ":" + str(seconds).zfill(2))

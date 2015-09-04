@@ -96,7 +96,7 @@ def main():
     #data in worksheet needs to be in header(column) and row structure
     worksheet_name_dict = {'Issuers': 'the_zoo.sti_issuers' ,'Ticker Information': 'the_zoo.sti_ticker_information',
                         'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings', 'Rating Scale': 'the_zoo.rating_scale', 
-                        'Money Market Yield': 'the_zoo.sti_money_mkt_yield', 'Cash Available': 'the_zoo.sti_cash_available'}
+                        'Money Market Yield': 'the_zoo.sti_money_mkt_yield', 'Cash Available': 'the_zoo.sti_cash_available','purchases': 'the_zoo.sti_daily_purchases'}
 
     #function call
     conn = connect_to_database(host_name,port,username,password,database)
@@ -110,7 +110,6 @@ def main():
     minutes, seconds = time_elapsed // 60, time_elapsed % 60
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
-
 
 
 
