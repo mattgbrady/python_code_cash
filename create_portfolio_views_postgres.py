@@ -680,11 +680,11 @@ def process_daily_data(conn):
 
     daily_mv_df.loc[daily_mv_df.loc[:,'issuer_name'] == 'Cash', 'annualized_yield'] = temp_df.values / 100
 
-    grouped = daily_mv_df.groupby('the_date')
+    #grouped = daily_mv_df.groupby('the_date')
 
-    print daily_mv_df
+    #print daily_mv_df
     
-    temp_df = df(grouped)
+    #temp_df = df(grouped)
     #print temp_df
     #print daily_mv_df
 
@@ -835,13 +835,13 @@ def main():
     the_date = max(daily_mv_df['the_date'])
     the_date = the_date.date()
 
-    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
-    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
-    #type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
-    #maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
-    #top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
-    #portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
-    #portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
+    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_sector_view',group_type='security_sector')
+    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_industry_view',group_type='industry')
+    type_view(conn,daily_mv_df, table_name = 'the_zoo.sti_daily_instrument_view',group_type='category')
+    maturity_bucket_view(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_maturity_bucket_view')
+    top_five_holdings(conn,daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_top_five_holdings_current')
+    portfolio_characteristics(conn, daily_mv_df,ticker_information_df, table_name = 'the_zoo.sti_daily_char')
+    portfolio_guidelines(conn, daily_mv_df,table_name = 'public.faq_total_fund_value_all_dates')
 
     end_time = time.time()
     time_elapsed = int(end_time - start_time)
