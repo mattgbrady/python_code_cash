@@ -572,6 +572,11 @@ def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
     top_five_df = current_df[:5].copy()
 
+
+    top_five_df.loc[top_five_df.loc[:,'issuer_name'] == 'Cash', 'maturity_date'] = date.today()
+    current_df.loc[current_df.loc[:,'issuer_name'] == 'Cash', 'maturity_date'] = date.today()
+
+
     upload_to_db_maturity_bucket(conn,top_five_df,table_name)
     upload_to_db_maturity_bucket(conn,current_df,table_name='the_zoo.sti_all_holdings_current')
 
@@ -662,7 +667,7 @@ def process_daily_data(conn):
     daily_mv_df = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_mv')
     ticker_information_df = created_df_from_postgres(conn,db_name='the_zoo.sti_ticker_information')
     daily_money_mkt_yield = created_df_from_postgres(conn,db_name='the_zoo.sti_money_mkt_yield')
-    daily_purchases = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_purchases')
+    daily_purchases = created_df_from_postgres(conn,db_name='the_zoo.sti_daily_transactions')
 
     daily_purchases.drop('id', axis=1, inplace=True)
 
