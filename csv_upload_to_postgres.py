@@ -96,13 +96,13 @@ def main():
     #data in worksheet needs to be in header(column) and row structure
     worksheet_name_dict = {'Issuers': 'the_zoo.sti_issuers' ,'Ticker Information': 'the_zoo.sti_ticker_information',
                         'Market Value': 'the_zoo.sti_daily_mv','Rating': 'the_zoo.sti_ratings', 'Rating Scale': 'the_zoo.rating_scale', 
-                        'Money Market Yield': 'the_zoo.sti_money_mkt_yield', 'Cash Available': 'the_zoo.sti_cash_available','purchases': 'the_zoo.sti_daily_purchases'}
+                        'Money Market Yield': 'the_zoo.sti_money_mkt_yield', 'Cash Available': 'the_zoo.sti_cash_available','Transactions': 'the_zoo.sti_daily_transactions'}
 
     #function call
     conn = connect_to_database(host_name,port,username,password,database)
 
     #function call
-    path = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Portfolio Reports\portfolio_tables.xlsx'
+    path = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Portfolio Reports\excel reports\portfolio_tables.xlsx'
     temp_df = process_file(conn,path,worksheet_name_dict)
 
     end_time = time.time()

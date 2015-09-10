@@ -9,10 +9,10 @@ import time
 start_time = time.time()
 
 print "Uploading cash flows to database"
-upload_df()
+#upload_df()
 
 print "Creating cash flow views"
-cash_flow_views()
+#cash_flow_views()
 
 print "Uploading portfolio to database"
 upload_portfolio_tables()
