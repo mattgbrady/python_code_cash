@@ -356,6 +356,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     
     sti_cf = sti_cf_view(conn,'the_zoo.sti_cash_flows')
 
+
     sti_cf.sort(columns='the_date', inplace=True)
 
     sti_cf.loc[:,'days_to_maturity'] = sti_cf.loc[:,'the_date'] - date.today()
@@ -373,9 +374,11 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     sti_cf.reset_index(inplace=True)
 
-    sti_cf = sti_cf.loc[(sti_cf.loc[:,'cash_flow_name'] == 'Transfer From STI') | (sti_cf.loc[:,'cash_flow_name'] == 'Transfer To STI')]
 
-    rolling_sti_transfer_from_sti = sti_cf.loc[sti_cf.loc[:,'cash_flow_name'] == 'Transfer From STI']
+    sti_cf = sti_cf.loc[(sti_cf.loc[:,'cash_flow_name'] == 'Total CAD Outflow') | (sti_cf.loc[:,'cash_flow_name'] == 'Total CAD Inflow')]
+
+
+    rolling_sti_transfer_from_sti = sti_cf.loc[sti_cf.loc[:,'cash_flow_name'] == 'Total CAD Outflow']
 
 
     rolling_sti_transfer_from_sti.set_index(['days_to_maturity'], inplace=True)
@@ -409,7 +412,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     rolling_sti_transfer_from_sti.fillna(0, inplace=True)
 
 
-    rolling_sti_transfer_to_sti = sti_cf.loc[sti_cf.loc[:,'cash_flow_name'] == 'Transfer To STI']
+    rolling_sti_transfer_to_sti = sti_cf.loc[sti_cf.loc[:,'cash_flow_name'] == 'Total CAD Inflow']
 
     rolling_sti_transfer_to_sti.set_index(['days_to_maturity'], inplace=True)
 
@@ -475,13 +478,19 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     temp_df = temp_df.append(sti_cf)
 
-    temp_df.loc[temp_df.loc[:,'cash_flow_name'] == 'Transfer To STI','market_value'] = temp_df.loc[temp_df.loc[:,'cash_flow_name'] == 'Transfer To STI','market_value'] * -1
+    temp_df.loc[temp_df.loc[:,'cash_flow_name'] == 'Total CAD Outflow','market_value'] = temp_df.loc[temp_df.loc[:,'cash_flow_name'] == 'Total CAD Outflow','market_value'] * -1
 
-    temp_df.loc[:,'market_value'] = np.where(temp_df.loc[:,'market_value'] == 0, None, temp_df.loc[:,'market_value'])
 
     temp_df.reset_index(inplace=True)
     temp_df.drop('index',axis=1,inplace=True)
 
+    
+    temp_df = temp_df.replace(to_replace='Total CAD Outflow',value='Outflow')
+    temp_df = temp_df.replace(to_replace='Total CAD Inflow',value='Inflow')
+
+    temp_df['market_value'].fillna(0, inplace=True)
+
+    temp_df.loc[:,'market_value'] = np.where(temp_df.loc[:,'market_value'] == 0, None, temp_df.loc[:,'market_value'])
 
     upload_to_db_maturity_bucket(conn,temp_df,'the_zoo.sti_current_maturity_bucket')
 
@@ -493,19 +502,20 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     rolling_cumulative_cash.reset_index()
 
+    
 
-    rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Transfer To STI','cumulative_cash'] = rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Transfer To STI','cumulative_cash'] * -1
-
-   
+ 
     diff_df = rolling_cumulative_cash
 
-    diff_df.loc[diff_df.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] = diff_df.loc[diff_df.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] * -1
-    
+    #diff_df.loc[diff_df.loc[:,'cash_flow_name'] == 'Total CAD Outflow','cumulative_cash'] = diff_df.loc[diff_df.loc[:,'cash_flow_name'] == 'Total CAD Outflow','cumulative_cash'] * -1
+
+
     diff_df = rolling_cumulative_cash.pivot(index='days_to_maturity', columns='cash_flow_name').swaplevel(1,0,axis=1)
+
 
     temp_series = diff_df.sum(axis=1)
 
-    
+   
     surplus_def = df(temp_series)
 
     surplus_def['cash_flow_name'] = 'Surplus/Deficit'
@@ -520,7 +530,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
 
     rolling_cumulative_cash.loc[:,'days_to_maturity'] = rolling_cumulative_cash[['days_to_maturity']].astype(int)
 
-    rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] = rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Transfer From STI','cumulative_cash'] * -1
+    rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Total CAD Outflow','cumulative_cash'] = rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Total CAD Outflow','cumulative_cash'] * -1
     rolling_cumulative_cash.loc[:,'cumulative_cash'] = np.where(rolling_cumulative_cash.loc[:,'cumulative_cash'] == 0, None, rolling_cumulative_cash.loc[:,'cumulative_cash'])
 
     rolling_sti_market_fill_zero = rolling_sti_market_fill_zero['market_value'].copy()
@@ -544,10 +554,12 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
 
     rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'STI Maturity', 'cash_flow_name'] = 'STI Maturity & Available Cash'
+    rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Total CAD Outflow', 'cash_flow_name'] = 'Outflow'
+    rolling_cumulative_cash.loc[rolling_cumulative_cash.loc[:,'cash_flow_name'] == 'Total CAD Inflow', 'cash_flow_name'] = 'Inflow'
 
+    
     upload_to_db_maturity_bucket(conn,rolling_cumulative_cash,'the_zoo.sti_rolling_cumulative_cf')
     upload_to_db_maturity_bucket(conn,rolling_sti_market_fill_zero,'the_zoo.sti_maturity_by_date')
-
 
 
 def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
@@ -685,31 +697,16 @@ def process_daily_data(conn):
 
     daily_mv_df.loc[daily_mv_df.loc[:,'issuer_name'] == 'Cash', 'annualized_yield'] = temp_df.values / 100
 
-    #grouped = daily_mv_df.groupby('the_date')
-
-    #print daily_mv_df
-    
-    #temp_df = df(grouped)
-    #print temp_df
-    #print daily_mv_df
 
     return daily_mv_df, ticker_information_df
 
 def sti_cf_view(conn,db_name):
 
-    criteria_1 = 'Starting STI Balance'
+    criteria_1 = 'STI CAD'
     criteria_1 = "'"+criteria_1+"'"
-    criteria_2 = 'Ending STI Balance'
-    criteria_2 = "'"+criteria_2+"'"
-    criteria_3 = 'Transfer From STI'
-    criteria_3 = "'"+criteria_3+"'"
-    criteria_4 = 'Transfer To STI'
-    criteria_4 = "'"+criteria_4+"'"
-    criteria_5 = 'Transfer FROM STI'
-    criteria_5 = "'"+criteria_5+"'"
+  
 
-    sql = ("SELECT max(created_at) FROM %s WHERE cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name = %s" % 
-        (db_name,criteria_1,criteria_2,criteria_3, criteria_4,criteria_5))
+    sql = ("SELECT max(created_at) FROM %s WHERE account_name = %s " % (db_name,criteria_1))
 
     conn.execute(sql)
     latest_created_at = conn.fetchone()
@@ -717,8 +714,7 @@ def sti_cf_view(conn,db_name):
     latest_created_at = latest_created_at.strftime("%Y-%m-%d")
     latest_created_at = "'"+latest_created_at+"'"
 
-    sql =  ("SELECT the_date, cash_flow_name, cash_flow_amount, created_at FROM %s WHERE (cash_flow_name = %s OR cash_flow_name = %s OR cash_flow_name =  %s OR cash_flow_name =  %s OR cash_flow_name =  %s) and created_at = %s " % 
-                (db_name,criteria_1, criteria_2, criteria_3, criteria_4,criteria_5, latest_created_at))
+    sql =  ("SELECT the_date, cash_flow_name, cash_flow_amount, created_at FROM %s WHERE (account_name = %s) and created_at = %s " % (db_name,criteria_1,latest_created_at))
  
     conn.execute(sql)
     
@@ -726,7 +722,7 @@ def sti_cf_view(conn,db_name):
 
     date_index = [i[0] for i in data_tuple]
 
-    columns= ['the_date','cash_flow_name','cash_flow_amount','db_created_at']
+    columns= ['the_date','cash_flow_name','cash_flow_amount', 'db_created_at']
 
     temp_df = df.from_records(data_tuple, columns=columns)
 
@@ -854,4 +850,3 @@ def main():
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
 
-main()

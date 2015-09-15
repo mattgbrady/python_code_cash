@@ -70,13 +70,15 @@ def process_file(conn,path_2,db_name):
 
 def format_df(df):
     df = df.sort('Cash Flow Name', na_position='first')
-    df = df[6:]
+  
+    df = df[2:]
     column = df['Account Name']
     column = [x for x in column]
     new_index = range(0,len(df.index))
     df = df.sort('Account Name')
     df['new_index'] = new_index
     df.fillna(value=0, inplace=True)
+
     return df.set_index('new_index')
 
 def scrub_loop_df(df,index_value):
@@ -131,7 +133,7 @@ def main():
         loop_df = loop_df[column_order]
         new_df = new_df.append(loop_df)
         new_df.index.name = 'the_date'
-    
+        
 
 
     current_date = datetime.today()
@@ -146,6 +148,7 @@ def main():
     new_df = new_df[(new_df['the_date'] >= current_date) & (new_df['the_date'] <= end_date)]
 
     new_df.to_csv('input_output_files/formatted_cash_flows.csv')
+
 
     # from user_credentials file
     host_name = database_credentials.host_name 
@@ -167,5 +170,3 @@ def main():
     minutes, seconds = time_elapsed // 60, time_elapsed % 60
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
-
-
