@@ -17,7 +17,7 @@ def connect_to_database(host_name,port,username,password,database):
         cur = conn.cursor()
         return cur
     except:
-        print "I am unable to connect to the database"  
+        print("I am unable to connect to the database" ) 
 
 def column_str(columns):
     column_string = ""

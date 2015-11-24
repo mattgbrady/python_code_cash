@@ -8,9 +8,16 @@ from datetime import date
 from datetime import timedelta
 from user_credentials import database_credentials
 
+from psycopg2.extensions import register_adapter, AsIs
+
+def adapt_numpy_int32(numpy_int32):
+     return AsIs(numpy_int32)
+
+register_adapter(np.int32, adapt_numpy_int32)
+
 def create_csv(path,worksheet_name_dict):
 
-    for worksheet_name, table_name in worksheet_name_dict.iteritems():
+    for worksheet_name, table_name in worksheet_name_dict.items():
         temp_df = pd.read_excel(path,worksheet_name)
         temp_df.to_csv(worksheet_name + ".csv", index=False)
 
@@ -21,7 +28,7 @@ def connect_to_database(host_name,port,username,password,database):
         cur = conn.cursor()
         return cur
     except:
-        print "I am unable to connect to the database"  
+        print("I am unable to connect to the database") 
 
 def column_str(columns):
     column_string = ""
@@ -72,7 +79,7 @@ def process_file(conn,path,worksheet_name_dict):
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_date = "'"+current_date+"'"
 
-    for worksheet_name, table_name in worksheet_name_dict.iteritems():
+    for worksheet_name, table_name in worksheet_name_dict.items():
 
         temp_df = pd.read_csv(worksheet_name + ".csv")
         columns = temp_df.columns.tolist()
@@ -102,7 +109,7 @@ def main():
     conn = connect_to_database(host_name,port,username,password,database)
 
     #function call
-    path = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Portfolio Reports\excel reports\portfolio_tables.xlsx'
+    path = 'X:/Users Seattle/Solutions/Clients/OPG/Cash Management/Portfolio Reports/excel reports/portfolio_tables.xlsx'
     temp_df = process_file(conn,path,worksheet_name_dict)
 
     end_time = time.time()

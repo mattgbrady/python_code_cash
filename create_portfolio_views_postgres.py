@@ -8,6 +8,12 @@ from datetime import datetime
 from datetime import timedelta
 import sys
 from user_credentials import database_credentials
+from psycopg2.extensions import register_adapter, AsIs
+
+def adapt_numpy_int32(numpy_int32):
+     return AsIs(numpy_int32)
+     
+register_adapter(np.int32, adapt_numpy_int32)
 
 def connect_to_database(host_name,port,username,password,database):
 
@@ -16,7 +22,7 @@ def connect_to_database(host_name,port,username,password,database):
         cur = conn.cursor()
         return cur
     except:
-        print "I am unable to connect to the database"  
+        print("I am unable to connect to the database") 
 
 def column_str(columns):
 
@@ -158,7 +164,7 @@ def check_security_duplicates(ticker_temp_df):
     duplicate_number = max(ticker_temp_df.loc[ticker_temp_df.loc[:,'ticker_dup'] == True].count())
 
     if duplicate_number != 0:
-        print ticker_temp_df.loc[ticker_temp_df.loc[:,'ticker_dup' == True]]
+        print(ticker_temp_df.loc[ticker_temp_df.loc[:,'ticker_dup' == True]])
         sys.exit("ERROR");
 
 def join_type_view_df(daily_mv_df,ticker_information_df,issuer_df):
@@ -827,7 +833,7 @@ def main():
     username = database_credentials.username
     password = database_credentials.password
     database = database_credentials.database
-
+    
 
     conn = connect_to_database(host_name,port,username,password,database)
 

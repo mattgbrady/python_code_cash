@@ -8,16 +8,16 @@ import time
 
 start_time = time.time()
 
-print "Uploading cash flows to database"
+print("Uploading cash flows to database")
 upload_df()
 
-print "Creating cash flow views"
+print("Creating cash flow views")
 cash_flow_views()
 
-print "Uploading portfolio to database"
+print("Uploading portfolio to database")
 upload_portfolio_tables()
 
-print "Creating portfolio views"
+print("Creating portfolio views")
 portfolio_views()
 
 

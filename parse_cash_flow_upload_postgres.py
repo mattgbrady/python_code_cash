@@ -16,7 +16,7 @@ def connect_to_database(host_name,port,username,password,database):
         cur = conn.cursor()
         return cur
     except:
-        print "I am unable to connect to the database"  
+        print("I am unable to connect to the database")
 
 def column_str(columns):
     column_string = ""
@@ -91,7 +91,7 @@ def main():
 
     start_time = time.time()
 
-    path_1 = 'X:\Users Seattle\Solutions\Clients\OPG\Cash Management\Projected Cash Flows/2015\OPG Cash Flow 2015.xlsx'
+    path_1 = 'X:/Users Seattle/Solutions/Clients/OPG/Cash Management/Projected Cash Flows/2015/OPG Cash Flow 2015.xlsx'
 
     temp_df = pd.read_excel(path_1, 'Operating Cash')
 
