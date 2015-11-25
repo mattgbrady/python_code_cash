@@ -59,11 +59,12 @@ def upload_to_db(conn,temp_df,table_name):
     max_date = max(temp_df['the_date'])
 
     date_look_back =max(temp_df.loc[:,'the_date'])-timedelta(days=days_look_back)
-
+    
     if min_date <= date_look_back:
         temp_df = temp_df.loc[temp_df.loc[:,'the_date'] >=  date_look_back]
-
-    temp_df.sort('the_date', inplace=True)
+    
+    temp_df.sort_values('the_date', inplace=True)
+    
     sql = ('TRUNCATE ' + table_name)
 
     db_name = table_name
@@ -363,7 +364,7 @@ def maturity_bucket_view(conn,daily_mv_df,ticker_information_df,table_name):
     sti_cf = sti_cf_view(conn,'the_zoo.sti_cash_flows')
 
 
-    sti_cf.sort(columns='the_date', inplace=True)
+    sti_cf.sort_values('the_date', inplace=True)
 
     sti_cf.loc[:,'days_to_maturity'] = sti_cf.loc[:,'the_date'] - date.today()
 
@@ -576,7 +577,7 @@ def top_five_holdings(conn,daily_mv_df,ticker_information_df,table_name) :
 
     current_df = daily_mv_df.loc[daily_mv_df.loc[:,'the_date'] == max(daily_mv_df.loc[:,'the_date'])]
 
-    current_df = current_df.sort('market_value', ascending=False)
+    current_df = current_df.sort_values('market_value', ascending=False)
 
     current_df.loc[:,'days_to_maturity'] = current_df.loc[:,'maturity_date'] - the_date
 
@@ -732,7 +733,7 @@ def sti_cf_view(conn,db_name):
 
     temp_df = df.from_records(data_tuple, columns=columns)
 
-    temp_df = temp_df.sort('the_date')
+    temp_df = temp_df.sort_values('the_date')
 
     return temp_df
 
@@ -762,7 +763,7 @@ def portfolio_guidelines(conn,daily_mv_df,table_name):
 
     opg_mk_value = df.from_records(data_tuple, columns=columns)
 
-    opg_mk_value = opg_mk_value.sort('the_date')
+    opg_mk_value = opg_mk_value.sort_values('the_date')
 
     opg_mk_value = opg_mk_value[['the_date','market_value']].copy()
 
@@ -855,4 +856,3 @@ def main():
     minutes, seconds = time_elapsed // 60, time_elapsed % 60
 
     print("Processing time is " + str(minutes) + ":" + str(seconds).zfill(2))
-

@@ -69,13 +69,13 @@ def process_file(conn,path_2,db_name):
     upload_to_db(db_name,columns,temp_df,conn)   
 
 def format_df(df):
-    df = df.sort('Cash Flow Name', na_position='first')
+    df = df.sort_values('Cash Flow Name', na_position='first')
   
     df = df[2:]
     column = df['Account Name']
     column = [x for x in column]
     new_index = range(0,len(df.index))
-    df = df.sort('Account Name')
+    df = df.sort_values('Account Name')
     df['new_index'] = new_index
     df.fillna(value=0, inplace=True)
 

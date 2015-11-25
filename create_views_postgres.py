@@ -79,7 +79,7 @@ def sti_cf_view(conn,db_name):
 
     temp_df = df.from_records(data_tuple, columns=columns)
 
-    temp_df = temp_df.sort('the_date')
+    temp_df = temp_df.sort_values('the_date')
 
     temp_df['cash_flow_amount'] = temp_df['cash_flow_amount'].apply(divide_1000)
 
@@ -138,7 +138,7 @@ def cad_operations_cf_view(conn,db_name):
 
     temp_df = df.from_records(data_tuple, columns=columns)
 
-    temp_df = temp_df.sort('the_date')
+    temp_df = temp_df.sort_values('the_date')
 
     temp_df['cash_flow_amount'] = temp_df['cash_flow_amount'].apply(divide_1000)
 
@@ -197,7 +197,7 @@ def usd_operations_cf_view(conn,db_name):
 
     temp_df = df.from_records(data_tuple, columns=columns)
 
-    temp_df = temp_df.sort('the_date')
+    temp_df = temp_df.sort_values('the_date')
 
     temp_df['cash_flow_amount'] = temp_df['cash_flow_amount'].apply(divide_1000)
 
